@@ -2,12 +2,12 @@
 
 namespace Drupal\flysystem_gcs_cors\Ajax;
 
-use Drupal\Core\Ajax\AjaxResponse;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Site\Settings;
-use Google\Cloud\Storage\StorageClient;
 use Drupal\file\Entity\File;
+use Google\Cloud\Storage\StorageClient;
+use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**
  * AJAX responses for module.

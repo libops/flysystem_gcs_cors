@@ -2,11 +2,11 @@
 
 namespace Drupal\flysystem_gcs_cors\Plugin\Field\FieldWidget;
 
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\file\Plugin\Field\FieldWidget\FileWidget;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\flysystem_gcs_cors\Element\FlysystemGcsCorsFile;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\file\Plugin\Field\FieldWidget\FileWidget;
+use Drupal\flysystem_gcs_cors\Element\FlysystemGcsCorsFile;
 
 /**
  * Plugin implementation of the 'flysystem_gcs_cors_file_widget' widget.
@@ -44,7 +44,7 @@ class FlysystemGcsCorsFileWidget extends FileWidget {
    *
    * This method is assigned as a #value_callback in formElement() method.
    */
-  public static function value($element, $input = FALSE, FormStateInterface $form_state = NULL) {
+  public static function value($element, $input = FALSE, ?FormStateInterface $form_state = NULL) {
     $return = FlysystemGcsCorsFile::valueCallback($element, $input, $form_state);
 
     // Ensure that all the required properties are returned even if empty.

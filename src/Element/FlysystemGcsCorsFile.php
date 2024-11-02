@@ -36,7 +36,7 @@ class FlysystemGcsCorsFile extends ManagedFile {
         'aria-live' => 'assertive',
       ],
       'info' => [
-        '#markup' => '<span>File is uploading...</span>'
+        '#markup' => '<span>File is uploading...</span>',
       ],
     ];
 
