@@ -11,10 +11,9 @@ use Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Site\Settings;
 use Drupal\file\Entity\File;
-use Drupal\token\TokenEntityMapperInterface;
+use Drupal\token\Token;
 use Google\Cloud\Storage\StorageClient;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\token\Token;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**
