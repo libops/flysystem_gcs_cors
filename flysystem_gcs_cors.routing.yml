@@ -11,9 +11,9 @@ flysystem_gcs_cors.get:
   path: '/ajax/gcs/{entity_type}/{bundle}/{entity_id}/{field}/{delta}/{file_name}'
   defaults:
     _title: 'GCS CORS Get Signed URL'
-    _controller: '\Drupal\flysystem_gcs_cors\Ajax\Gcs::getSignedUrl'
+    _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::getSignedUrl'
   requirements:
-    _custom_access: '\Drupal\flysystem_gcs_cors\Ajax\Gcs::access'
+    _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
   options:
     parameters:
       entity_type:
@@ -32,9 +32,9 @@ flysystem_gcs_cors.save:
   path: '/ajax/gcs/{entity_type}/{bundle}/{entity_id}/{field}/{delta}/{file_name}/{file_size}'
   defaults:
     _title: 'GCS CORS Save File'
-    _controller: '\Drupal\flysystem_gcs_cors\Ajax\Gcs::saveFile'
+    _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::saveFile'
   requirements:
-    _custom_access: '\Drupal\flysystem_gcs_cors\Ajax\Gcs::access'
+    _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
   options:
     parameters:
       entity_type:
