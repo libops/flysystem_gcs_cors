@@ -134,7 +134,19 @@
                       fd.append('ajax_page_state[theme_token]', drupalSettings.ajaxPageState.theme_token);
                       fd.append('ajax_page_state[libraries]', drupalSettings.ajaxPageState.libraries);
                       // Calculate the post url to use.
-                      var posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax';
+                      var posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax&';
+
+                      // integrate with drupal/form_mode_control
+                      // checking for ?display=foo and appending
+                      // to AJAX request if so
+                      var queryString = window.location.search.substring(1);
+                      var queryParams = queryString.split('&');
+                      for (var i = 0; i < queryParams.length; i++) {
+                        var pair = queryParams[i].split('=');
+                        if (decodeURIComponent(pair[0]) === "display") {
+                          posturl += "display=" + decodeURIComponent(pair[1]);
+                        }
+                      }
 
                       // Generate and send an ajax request with the uploaded file details.
                       $.ajax({
