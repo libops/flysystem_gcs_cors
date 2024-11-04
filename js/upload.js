@@ -1,4 +1,4 @@
-(function ($, Drupal) {
+(function ($, Drupal, drupalSettings) {
 
   'use strict';
 
@@ -90,7 +90,6 @@
                 $.get({
                   url: save_file_uri,
                   success: function(data) {
-                    console.log(data)
                     if (!data.fid) {
                       if (data.errmsg) {
                         alert(data.errmsg);
@@ -104,6 +103,7 @@
                     // Add the fid for this file to hidden fids field.
                     var fid = data.fid;
                     var fid_selector = target_id.replace(/upload$/, 'fids');
+
                     var fids = $('[data-drupal-selector=' + fid_selector + ']').val();
                     fids = (fids) ? fids + ' ' + fid : fid;
                     $('[data-drupal-selector=' + fid_selector + ']').val(fids);
@@ -123,7 +123,7 @@
                       // Get the relevant submit input into FormData.
                       var submits = form.find(':input.js-form-submit');
                       submits.each(function () {
-                        if (this.name.substr(0, field_name.length) == field_name) {
+                        if (this.name.substr(0, field_name_key.length) == field_name_key) {
                           fd.append('_triggering_element_name', this.name);
                           fd.append('_triggering_element_value', $(this).val());
                         }
@@ -197,4 +197,4 @@
     },
   };
 
-})(jQuery, Drupal);
+})(jQuery, Drupal, drupalSettings);

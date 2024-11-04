@@ -57,7 +57,12 @@ class FlysystemGcsCorsFile extends ManagedFile {
       'entity_id' => $form_state->getformObject()->getEntity()->id(),
     ];
 
+
     $element_parents = $element['#array_parents'];
+    if ($element['#multiple']) {
+      array_pop($element_parents);
+    }
+
     $field_name = $element['#field_name'];
     $js_settings['element_parents'] = implode('/', $element_parents);
     $element['upload']['#attached']['drupalSettings']['gcs_flysystem_cors'][$field_name] = $js_settings;
