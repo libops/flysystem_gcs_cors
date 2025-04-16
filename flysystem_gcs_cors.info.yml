@@ -1,7 +1,7 @@
-name: 'Flysystem Google Cloud Storage CORS Upload'
+name: "Flysystem Google Cloud Storage CORS Upload"
 type: module
-description: 'Allow directly uploading files to GCS from the web browser'
+description: "Allow directly uploading files to GCS from the web browser"
 package: Flysystem
-core_version_requirement: ^9 || ^10 || ^11
+core_version_requirement: ^10.2 || ^11
 dependencies:
   - flysystem_gcs:flysystem_gcs

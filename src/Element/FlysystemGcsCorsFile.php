@@ -57,7 +57,6 @@ class FlysystemGcsCorsFile extends ManagedFile {
       'entity_id' => $form_state->getformObject()->getEntity()->id(),
     ];
 
-
     $element_parents = $element['#array_parents'];
     if ($element['#multiple']) {
       array_pop($element_parents);
