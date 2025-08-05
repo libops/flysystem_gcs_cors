@@ -14,7 +14,7 @@ use Drupal\image\Plugin\Field\FieldType\ImageItem;
  *   id = "flysystem_gcs_cors_image",
  *   label = @Translation("Image"),
  *   description = @Translation("This field stores the ID of an image file as an integer value."),
- *   category = @Translation("Reference"),
+ *   category = "Reference",
  *   default_widget = "flysystem_gcs_cors_image_widget",
  *   default_formatter = "image",
  *   column_groups = {

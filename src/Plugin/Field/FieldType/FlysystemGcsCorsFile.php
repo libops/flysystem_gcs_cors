@@ -14,7 +14,7 @@ use Drupal\file\Plugin\Field\FieldType\FileItem;
  *   id = "flysystem_gcs_cors_file",
  *   label = @Translation("Flysystem GCS Cors File"),
  *   description = @Translation("This field stores the ID of a file as an integer value."),
- *   category = @Translation("Reference"),
+ *   category = "Reference",
  *   default_widget = "flysystem_gcs_cors_file_widget",
  *   default_formatter = "file_default",
  *   list_class = "\Drupal\file\Plugin\Field\FieldType\FileFieldItemList",
