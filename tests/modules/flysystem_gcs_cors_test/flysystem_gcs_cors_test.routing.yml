@@ -1,0 +1,7 @@
+flysystem_gcs_cors_test.fake_upload:
+  path: '/flysystem-gcs-cors-test/upload'
+  defaults:
+    _controller: '\Drupal\flysystem_gcs_cors_test\Controller\FakeUploadController::upload'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]

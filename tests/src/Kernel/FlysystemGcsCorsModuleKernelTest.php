@@ -5,6 +5,7 @@ namespace Drupal\Tests\flysystem_gcs_cors\Kernel;
 use Drupal\KernelTests\KernelTestBase;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
 /**
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
  */
 #[CoversNothing]
 #[Group('flysystem_gcs_cors')]
+#[IgnoreDeprecations]
 #[RunTestsInSeparateProcesses]
 class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
 

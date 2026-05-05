@@ -84,7 +84,6 @@ class AdminForm extends ConfigFormBase {
 
     $origin = $form_state->getValue('origin');
     $scheme = $form_state->getValue('scheme');
-    $bucket = $this->gcsBucketResolver->getBucket($scheme);
 
     $this->config('flysystem_gcs_cors.admin')
       ->set('origin', $origin)
@@ -106,9 +105,7 @@ class AdminForm extends ConfigFormBase {
       ],
       ];
     }
-    $bucket->update([
-      'cors' => $cors,
-    ]);
+    $this->gcsBucketResolver->updateBucketCors($scheme, $cors);
   }
 
 }

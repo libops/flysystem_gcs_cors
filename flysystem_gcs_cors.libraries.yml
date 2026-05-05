@@ -5,6 +5,8 @@ upload:
   js:
     js/upload.js: {}
   dependencies:
-    - core/once
     - core/drupal
+    - core/drupal.ajax
     - core/drupalSettings
+    - core/jquery
+    - core/once

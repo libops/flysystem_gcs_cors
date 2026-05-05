@@ -9,13 +9,10 @@ flysystem_gcs_cors.admin:
       type: string
       label: 'Flysystem scheme'
 
-field.widget.settings.gcs_cors_widget:
-  type: mapping
-  label: 'Gcs cors widget widget settings'
-  mapping:
-    size:
-      type: integer
-      label: 'Size'
-    placeholder:
-      type: textfield
-      label: 'Placeholder'
+field.widget.settings.flysystem_gcs_cors_file_widget:
+  type: field.widget.settings.file_generic
+  label: 'GCS CORS file widget settings'
+
+field.widget.settings.flysystem_gcs_cors_image_widget:
+  type: field.widget.settings.image_image
+  label: 'GCS CORS image widget settings'

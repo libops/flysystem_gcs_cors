@@ -3,7 +3,6 @@
 namespace Drupal\flysystem_gcs_cors;
 
 use Drupal\Core\Site\Settings;
-use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageClient;
 
 /**
@@ -46,9 +45,30 @@ class GcsBucketResolver {
   }
 
   /**
+   * Generates signed POST policy data for an object upload.
+   *
+   * @return array
+   *   The signed POST policy response structure.
+   */
+  public function generateSignedPostPolicyV4(string $scheme, string $object_name, \DateTimeInterface $valid_for): array {
+    $bucket = $this->buildBucket($scheme);
+    return $bucket->generateSignedPostPolicyV4($object_name, $valid_for);
+  }
+
+  /**
+   * Updates the configured bucket CORS policy for a scheme.
+   */
+  public function updateBucketCors(string $scheme, array $cors): void {
+    $bucket = $this->buildBucket($scheme);
+    $bucket->update([
+      'cors' => $cors,
+    ]);
+  }
+
+  /**
    * Builds a Google Cloud Storage bucket client for a scheme.
    */
-  public function getBucket(string $scheme): Bucket {
+  protected function buildBucket(string $scheme) {
     $config = $this->getBucketConfig($scheme);
     if ($config === NULL) {
       throw new \InvalidArgumentException(sprintf('The "%s" scheme is not configured as a GCS Flysystem backend.', $scheme));

@@ -112,10 +112,9 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
     }
 
-    $bucket = $this->gcsBucketResolver->getBucket($scheme);
-
     $validFor = new \DateTime('10 min');
-    $response = $bucket->generateSignedPostPolicyV4(
+    $response = $this->gcsBucketResolver->generateSignedPostPolicyV4(
+      $scheme,
       $this->getDirectory($file_directory_untokenized, $entity_type, $entity_id) . '/' . $file_name,
       $validFor
     );

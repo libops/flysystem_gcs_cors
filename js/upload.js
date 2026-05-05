@@ -31,50 +31,47 @@
 
     triggerUploadButton: function (event) {
 
-      var file_input = $('input#' + event.target.id);
-      var form = file_input.closest('form');
+      const fileInput = $('input#' + event.target.id);
+      const form = fileInput.closest('form');
       form.find(':input[type="submit"]').attr('disabled', 'disabled');
       form.find('.loader').removeClass('js-hide');
 
-      // Get the filelist and the number of files to be uploaded.
-      var filelist = file_input[0].files;
-      var file_input = $('input#' + event.target.id);
-      var form = file_input.closest('form');
-
-      form.find(':input[type="submit"]').attr('disabled', 'disabled');
-
-      var target_id = event.target.id;
-      if (target_id.indexOf('--') >= 0) {
-        target_id = target_id.split('--')[0];
+      let targetId = event.target.id;
+      if (targetId.indexOf('--') >= 0) {
+        targetId = targetId.split('--')[0];
       }
-      var field_name = target_id.split('-');
-      var field_name_array = field_name.slice(1, field_name.length - 2);
-      var delta = field_name[field_name.length - 2];
-      var field_name_key = field_name_array.join('_');
-      var settings = event.data.settings[field_name_key];
-      var entity_type = settings.entity_type
-      var bundle = settings.bundle
-      var entity_id = settings.entity_id
-
-      var baseUrl = event.data.baseUrl;
+      const fieldNameKey = event.target.dataset.gcsCorsFieldName;
+      Drupal.gcsCors.uploadStatus = Drupal.gcsCors.uploadStatus || {};
+      Drupal.gcsCors.uploadStatus[targetId] = {
+        expected: fileInput[0].files.length,
+        fids: []
+      };
+      const settings = (event.data.settings || {})[fieldNameKey];
+      if (!settings) {
+        Drupal.gcsCors.uploadStatus[targetId].error = 'Missing upload settings for ' + fieldNameKey;
+        return;
+      }
+      const entityType = settings.entity_type;
+      const bundle = settings.bundle;
+      const entityId = settings.entity_id;
+      const baseUrl = event.data.baseUrl;
 
       // Get the filelist and the number of files to be uploaded.
-      var filelist = file_input[0].files;
-      var num_files = filelist.length;
+      const filelist = fileInput[0].files;
+      const numFiles = filelist.length;
 
       // Process each specified file.
-      for (var delta = 0; delta < num_files; delta++) {
-
-        var file_obj = filelist[delta];
-        var ajax_uri = baseUrl + 'ajax/gcs/' + entity_type + '/' + bundle + '/' + entity_id + '/' + field_name_key + '/' + delta + '/' + encodeURIComponent(file_obj.name);
+      for (let delta = 0; delta < numFiles; delta++) {
+        const fileObj = filelist[delta];
+        const ajaxUri = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/' + entityId + '/' + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name);
         $.get({
-          url: ajax_uri,
+          url: ajaxUri,
           success: function (r) {
-            var fd = new FormData();
+            const fd = new FormData();
             $.each(r['fields'], function (key, value) {
               fd.append(key, value);
             });
-            fd.append('file', file_obj);
+            fd.append('file', fileObj);
 
             $.ajax({
               url: r['url'],
@@ -86,9 +83,9 @@
               processData: false,
               crossDomain: true,
               success: function(r2) {
-                var save_file_uri = baseUrl + 'ajax/gcs/' + entity_type + '/' + bundle + '/' + entity_id + '/' + field_name_key + '/' + delta + '/' + encodeURIComponent(file_obj.name) + '/' + file_obj.size;
+                const saveFileUri = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/' + entityId + '/' + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name) + '/' + fileObj.size;
                 $.get({
-                  url: save_file_uri,
+                  url: saveFileUri,
                   success: function(data) {
                     if (!data.fid) {
                       if (data.errmsg) {
@@ -101,29 +98,30 @@
                     }
 
                     // Add the fid for this file to hidden fids field.
-                    var fid = data.fid;
-                    var fid_selector = target_id.replace(/upload$/, 'fids');
+                    const fid = data.fid;
+                    Drupal.gcsCors.uploadStatus[targetId].fids.push(fid);
+                    const fidSelector = targetId.replace(/upload$/, 'fids');
 
-                    var fids = $('[data-drupal-selector=' + fid_selector + ']').val();
+                    let fids = $('[data-drupal-selector=' + fidSelector + ']').val();
                     fids = (fids) ? fids + ' ' + fid : fid;
-                    $('[data-drupal-selector=' + fid_selector + ']').val(fids);
+                    $('[data-drupal-selector=' + fidSelector + ']').val(fids);
 
                     // Post the results to Drupal if all files have been processed.
-                    var num_fids = fids.split(' ').length;
-                    if (num_fids == filelist.length) {
+                    const numFids = fids.split(' ').length;
+                    if (numFids == filelist.length) {
                       // Use the HTML5 FormData API to build a POST form to send to Drupal.
-                      var fd = new FormData();
+                      const fd = new FormData();
                       // Get the non-submit inputs for processing into FormData.
-                      var inputs = form.find(':input').not('.js-form-submit');
+                      const inputs = form.find(':input').not('.js-form-submit');
                       inputs.each(function () {
                         if (this.name) {
                           fd.append(this.name, $(this).val());
                         }
                       });
                       // Get the relevant submit input into FormData.
-                      var submits = form.find(':input.js-form-submit');
+                      const submits = form.find(':input.js-form-submit');
                       submits.each(function () {
-                        if (this.name.substr(0, field_name_key.length) == field_name_key) {
+                        if (this.name.substr(0, fieldNameKey.length) == fieldNameKey) {
                           fd.append('_triggering_element_name', this.name);
                           fd.append('_triggering_element_value', $(this).val());
                         }
@@ -134,15 +132,15 @@
                       fd.append('ajax_page_state[theme_token]', drupalSettings.ajaxPageState.theme_token);
                       fd.append('ajax_page_state[libraries]', drupalSettings.ajaxPageState.libraries);
                       // Calculate the post url to use.
-                      var posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax&';
+                      let posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax&';
 
                       // integrate with drupal/form_mode_control
                       // checking for ?display=foo and appending
                       // to AJAX request if so
-                      var queryString = window.location.search.substring(1);
-                      var queryParams = queryString.split('&');
-                      for (var i = 0; i < queryParams.length; i++) {
-                        var pair = queryParams[i].split('=');
+                      const queryString = window.location.search.substring(1);
+                      const queryParams = queryString.split('&');
+                      for (let i = 0; i < queryParams.length; i++) {
+                        const pair = queryParams[i].split('=');
                         if (decodeURIComponent(pair[0]) === "display") {
                           posturl += "display=" + decodeURIComponent(pair[1]);
                         }
@@ -162,23 +160,24 @@
                         success: function (response, status, xmlHttpRequest) {
                           // Set the relevant selector in any of the returned Ajax
                           // commands that have a null selector.
-                          var responseLength = response.length;
-                          for (var i = 0; i < responseLength; i++) {
-                            var selector = response[i].selector;
+                          const responseLength = response.length;
+                          for (let i = 0; i < responseLength; i++) {
+                            const selector = response[i].selector;
                             if (selector === null) {
                               // Find the first descendant div with an id beginning with "ajax-wrapper".
-                              var field_ajax_wrapper = $('div[data-drupal-selector="edit-' + field_name_key.replace(/_/g,'-') + '-wrapper"]');
+                              let fieldAjaxWrapper = $('div[data-drupal-selector="edit-' + fieldNameKey.replace(/_/g,'-') + '-wrapper"]');
+                              let childDivId;
                               do {
-                                field_ajax_wrapper = field_ajax_wrapper.find('div:first-child');
-                                var child_div_id = field_ajax_wrapper.prop('id');
+                                fieldAjaxWrapper = fieldAjaxWrapper.find('div:first-child');
+                                childDivId = fieldAjaxWrapper.prop('id');
                               }
-                              while (child_div_id == '' || child_div_id.indexOf('ajax-wrapper') == -1);
-                              response[i].selector = '#' + child_div_id;
+                              while (childDivId == '' || childDivId.indexOf('ajax-wrapper') == -1);
+                              response[i].selector = '#' + childDivId;
                             }
                           }
                           // Create a Drupal.Ajax object without associating an
                           // element, a progress indicator or a URL.
-                          var ajaxObject = Drupal.ajax({
+                          const ajaxObject = Drupal.ajax({
                             url: posturl,
                             base: false,
                             element: false,

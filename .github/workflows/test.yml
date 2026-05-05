@@ -23,15 +23,5 @@ jobs:
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
-      - name: PHPUNIT tests
-        run: |
-          docker run \
-            --name drupal \
-            --hostname drupal \
-            --rm \
-            --volume $(pwd):/var/www/drupal/web/modules/contrib/$ENABLE_MODULES:ro \
-            --env ENABLE_MODULES \
-           ghcr.io/islandora/ci:${{ matrix.drupal-version }}-php${{ matrix.php-versions }}
-        env:
-          ENABLE_MODULES: flysystem_gcs_cors
-
+      - name: Tests
+        run: make test DRUPAL_VERSION=${{ matrix.drupal-version }} PHP_VERSION=${{ matrix.php-versions }}

@@ -4,7 +4,8 @@
     "type": "drupal-module",
     "homepage": "https://www.drupal.org/project/flysystem_gcs_cors",
     "require": {
-        "drupal/token" : "^1.17"
+        "drupal/flysystem_gcs": "^1.0@beta",
+        "drupal/token": "^1.17"
     },
     "support": {
         "issues": "https://www.drupal.org/project/issues/flysystem_gcs_cors"

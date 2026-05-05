@@ -1,0 +1,5 @@
+name: 'Flysystem GCS CORS Test'
+type: module
+description: 'Testing support module for flysystem_gcs_cors browser tests.'
+package: Testing
+core_version_requirement: ^10.2 || ^11
