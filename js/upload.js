@@ -89,12 +89,18 @@
                 $.get({
                   url: baseUrl + 'session/token',
                   success: function(csrfToken) {
+                    const saveData = new FormData();
+                    saveData.append('object_name', r['object_name']);
                     $.ajax({
                       url: saveFileUri,
                       type: 'POST',
                       headers: {
                         'X-CSRF-Token': csrfToken
                       },
+                      data: saveData,
+                      cache: false,
+                      contentType: false,
+                      processData: false,
                       success: function(data) {
                         if (!data.fid) {
                           if (data.errmsg) {

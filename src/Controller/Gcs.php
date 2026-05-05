@@ -14,6 +14,7 @@ use Drupal\file\Entity\File;
 use Drupal\flysystem_gcs_cors\GcsBucketResolver;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * AJAX responses for module.
@@ -70,9 +71,16 @@ class Gcs extends ControllerBase {
   protected $gcsBucketResolver;
 
   /**
+   * The request stack service.
+   *
+   * @var \Symfony\Component\HttpFoundation\RequestStack
+   */
+  protected $requestStack;
+
+  /**
    * {@inheritdoc}
    */
-  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user, GcsBucketResolver $gcs_bucket_resolver) {
+  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user, GcsBucketResolver $gcs_bucket_resolver, RequestStack $request_stack) {
     $this->mimeTypeGuesser = $mime_type_guesser;
     $this->entityFieldManager = $entity_field_manager;
     $this->entityTypeManager = $entity_type_manager;
@@ -80,6 +88,7 @@ class Gcs extends ControllerBase {
     $this->token = $token;
     $this->currentUser = $current_user;
     $this->gcsBucketResolver = $gcs_bucket_resolver;
+    $this->requestStack = $request_stack;
   }
 
   /**
@@ -93,7 +102,8 @@ class Gcs extends ControllerBase {
       $container->get('module_handler'),
       $container->get('token'),
       $container->get('current_user'),
-      $container->get('flysystem_gcs_cors.gcs_bucket_resolver')
+      $container->get('flysystem_gcs_cors.gcs_bucket_resolver'),
+      $container->get('request_stack')
     );
   }
 
@@ -112,12 +122,14 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
     }
 
+    $object_name = $this->buildObjectName($file_directory_untokenized, $entity_type, $entity_id, $file_name);
     $validFor = new \DateTime('10 min');
     $response = $this->gcsBucketResolver->generateSignedPostPolicyV4(
       $scheme,
-      $this->getDirectory($file_directory_untokenized, $entity_type, $entity_id) . '/' . $file_name,
+      $object_name,
       $validFor
     );
+    $response['object_name'] = $object_name;
 
     return new JsonResponse($response);
   }
@@ -137,7 +149,10 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
     }
 
-    $object_name = $this->getDirectory($file_directory_untokenized, $entity_type, $entity_id) . '/' . $file_name;
+    $object_name = $this->requestStack->getCurrentRequest()->request->get('object_name');
+    if (!$this->isValidObjectName($object_name, $file_directory_untokenized, $entity_type, $entity_id, $file_name)) {
+      return new JsonResponse(['errmsg' => 'Invalid uploaded object name.'], 400);
+    }
     $object_metadata = $this->gcsBucketResolver->getObjectMetadata($scheme, $object_name);
     if ($object_metadata === NULL) {
       return new JsonResponse(['errmsg' => 'The uploaded object was not found in GCS.'], 404);
@@ -227,6 +242,29 @@ class Gcs extends ControllerBase {
       }
     }
     return $this->token->replace($file_directory_untokenized, $data);
+  }
+
+  /**
+   * Builds a unique object name for a pending browser upload.
+   */
+  private function buildObjectName($file_directory_untokenized, $entity_type, $entity_id, $file_name): string {
+    $directory = trim($this->getDirectory($file_directory_untokenized, $entity_type, $entity_id), '/');
+    $prefix = $directory === '' ? '' : $directory . '/';
+    return $prefix . bin2hex(random_bytes(16)) . '-' . $file_name;
+  }
+
+  /**
+   * Checks that the submitted object belongs to the expected upload directory.
+   */
+  private function isValidObjectName($object_name, $file_directory_untokenized, $entity_type, $entity_id, $file_name): bool {
+    if (!is_string($object_name) || $object_name === '') {
+      return FALSE;
+    }
+    $directory = trim($this->getDirectory($file_directory_untokenized, $entity_type, $entity_id), '/');
+    $prefix = $directory === '' ? '' : $directory . '/';
+    return str_starts_with($object_name, $prefix)
+      && str_ends_with($object_name, '-' . $file_name)
+      && !in_array('..', explode('/', $object_name), TRUE);
   }
 
 }

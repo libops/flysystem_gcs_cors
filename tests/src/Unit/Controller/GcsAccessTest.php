@@ -17,6 +17,8 @@ use Drupal\flysystem_gcs_cors\GcsBucketResolver;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Tests controller access rules for GCS upload routes.
@@ -207,6 +209,50 @@ class GcsAccessTest extends UnitTestCase {
   }
 
   /**
+   * Tests duplicate filenames receive distinct GCS object names.
+   */
+  public function testSignedUrlsUseUniqueObjectNamesForDuplicateFilenames(): void {
+    $field_definition = $this->createMock(FieldDefinitionInterface::class);
+    $field_definition->method('getSetting')
+      ->willReturnMap([
+        ['file_directory', 'browser-test'],
+        ['uri_scheme', 'gcs'],
+      ]);
+
+    $field_manager = $this->createMock(EntityFieldManagerInterface::class);
+    $field_manager->method('getFieldDefinitions')
+      ->with('node', 'article')
+      ->willReturn([
+        'field_upload' => $field_definition,
+      ]);
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+    $resolver->method('generateSignedPostPolicyV4')
+      ->willReturnCallback(static fn (string $scheme, string $object_name, \DateTimeInterface $valid_for): array => [
+        'url' => 'https://uploads.example.test',
+        'fields' => [
+          'key' => $object_name,
+        ],
+      ]);
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+
+    $first = json_decode($controller->getSignedUrl('node', 'article', 'field_upload', 0, 'report.txt')->getContent(), TRUE);
+    $second = json_decode($controller->getSignedUrl('node', 'article', 'field_upload', 1, 'report.txt')->getContent(), TRUE);
+
+    $this->assertNotSame($first['object_name'], $second['object_name']);
+    $this->assertStringStartsWith('browser-test/', $first['object_name']);
+    $this->assertStringEndsWith('-report.txt', $first['object_name']);
+    $this->assertSame($first['object_name'], $first['fields']['key']);
+    $this->assertSame($second['object_name'], $second['fields']['key']);
+  }
+
+  /**
    * Tests file entities are not saved unless the GCS object exists.
    */
   public function testSaveFileRejectsMissingGcsObject(): void {
@@ -232,10 +278,10 @@ class GcsAccessTest extends UnitTestCase {
       ->willReturn(TRUE);
     $resolver->expects($this->once())
       ->method('getObjectMetadata')
-      ->with('gcs', 'browser-test/report.txt')
+      ->with('gcs', 'browser-test/abc123-report.txt')
       ->willReturn(NULL);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-report.txt');
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
@@ -270,13 +316,13 @@ class GcsAccessTest extends UnitTestCase {
       ->willReturn(TRUE);
     $resolver->expects($this->once())
       ->method('getObjectMetadata')
-      ->with('gcs', 'browser-test/report.txt')
+      ->with('gcs', 'browser-test/abc123-report.txt')
       ->willReturn([
         'size' => 321,
         'contentType' => 'text/plain',
       ]);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-report.txt');
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
@@ -286,15 +332,55 @@ class GcsAccessTest extends UnitTestCase {
   }
 
   /**
+   * Tests file entities are not saved for unrelated objects in the directory.
+   */
+  public function testSaveFileRejectsObjectNameForDifferentFilename(): void {
+    $field_definition = $this->createMock(FieldDefinitionInterface::class);
+    $field_definition->method('getSetting')
+      ->willReturnMap([
+        ['file_directory', 'browser-test'],
+        ['uri_scheme', 'gcs'],
+      ]);
+
+    $field_manager = $this->createMock(EntityFieldManagerInterface::class);
+    $field_manager->method('getFieldDefinitions')
+      ->with('node', 'article')
+      ->willReturn([
+        'field_upload' => $field_definition,
+      ]);
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+    $resolver->expects($this->never())
+      ->method('getObjectMetadata');
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-other.txt');
+
+    $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
+    $payload = json_decode($response->getContent(), TRUE);
+
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame('Invalid uploaded object name.', $payload['errmsg']);
+  }
+
+  /**
    * Builds the controller with lightweight test doubles.
    */
-  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager, GcsBucketResolver $resolver): Gcs {
+  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager, GcsBucketResolver $resolver, ?string $object_name = NULL): Gcs {
     $mime_type_guesser = $this->createMock('Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser');
     $module_handler = $this->createMock(ModuleHandlerInterface::class);
     $token = $this->createMock(Token::class);
     $token->method('replace')
       ->willReturnArgument(0);
     $current_user = $this->createMock(AccountProxyInterface::class);
+    $request_stack = new RequestStack();
+    $request_stack->push(Request::create('/', 'POST', $object_name === NULL ? [] : [
+      'object_name' => $object_name,
+    ]));
 
     return new Gcs(
       $mime_type_guesser,
@@ -304,6 +390,7 @@ class GcsAccessTest extends UnitTestCase {
       $token,
       $current_user,
       $resolver,
+      $request_stack,
     );
   }
 
