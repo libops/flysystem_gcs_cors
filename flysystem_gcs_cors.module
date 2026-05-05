@@ -25,12 +25,13 @@ function flysystem_gcs_cors_help($route_name, RouteMatchInterface $route_match) 
 
 /**
  * Implements hook_field_info_alter().
+ *
+ * The override is intentionally global because upload validators are resolved
+ * from the field item class, not from just the selected widget. The replacement
+ * classes preserve core storage behavior and only raise the upload-size ceiling
+ * for fields using a Flysystem scheme configured with the GCS driver.
  */
 function flysystem_gcs_cors_field_info_alter(array &$info) {
-  // Need to override the file and image fields
-  // to allow setting uploads larger than what PHP allows
-  // since we're avoiding PHP altogether and uploading directly to GCS
-  // do not need to be constrained by PHP's memory limits.
   $info['file']['class'] = '\Drupal\flysystem_gcs_cors\Plugin\Field\FieldType\FlysystemGcsCorsFile';
   $info['image']['class'] = '\Drupal\flysystem_gcs_cors\Plugin\Field\FieldType\FlysystemGcsCorsImage';
 }

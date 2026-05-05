@@ -2,15 +2,40 @@
 
 namespace Drupal\flysystem_gcs_cors\Form;
 
+use Drupal\Component\Utility\Bytes;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Site\Settings;
-use Google\Cloud\Storage\StorageClient;
+use Drupal\flysystem_gcs_cors\GcsBucketResolver;
+use Drupal\flysystem_gcs_cors\GcsUploadLimits;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Admin settings form.
  */
 class AdminForm extends ConfigFormBase {
+
+  /**
+   * The GCS bucket resolver service.
+   *
+   * @var \Drupal\flysystem_gcs_cors\GcsBucketResolver
+   */
+  protected $gcsBucketResolver;
+
+  /**
+   * Constructs the admin form.
+   */
+  public function __construct(GcsBucketResolver $gcs_bucket_resolver) {
+    $this->gcsBucketResolver = $gcs_bucket_resolver;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('flysystem_gcs_cors.gcs_bucket_resolver')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -36,16 +61,11 @@ class AdminForm extends ConfigFormBase {
     $form['origin'] = [
       '#type' => 'url',
       '#title' => $this->t('Origin'),
-      '#description' => $this->t('The origin that will be allowed to PUT to your GCS bucket'),
+      '#description' => $this->t('The origin that will be allowed to POST and PUT to your GCS bucket.'),
       '#default_value' => $config->get('origin'),
     ];
 
-    $options = [];
-    foreach (Settings::get('flysystem', []) as $scheme => $settings) {
-      if ($settings['driver'] === 'gcs') {
-        $options[$scheme] = $scheme . ':// -> ' . $settings['config']['bucket'];
-      }
-    }
+    $options = $this->gcsBucketResolver->getSchemeOptions();
 
     $form['scheme'] = [
       '#type' => 'select',
@@ -55,7 +75,32 @@ class AdminForm extends ConfigFormBase {
       '#default_value' => $config->get('scheme'),
       '#required' => TRUE,
     ];
+
+    $form['max_upload_size'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Maximum upload size'),
+      '#description' => $this->t('The largest file this module will allow for GCS-backed fields. Use values such as 10 GB or 500 MB. The hard maximum is 5 TiB.'),
+      '#default_value' => $config->get('max_upload_size') ?: GcsUploadLimits::DEFAULT_MAX_UPLOAD_SIZE,
+      '#required' => TRUE,
+    ];
+
     return parent::buildForm($form, $form_state);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    parent::validateForm($form, $form_state);
+
+    $max_upload_size = trim((string) $form_state->getValue('max_upload_size'));
+    $max_upload_size_bytes = Bytes::toNumber($max_upload_size);
+    if ($max_upload_size_bytes <= 0) {
+      $form_state->setErrorByName('max_upload_size', $this->t('Enter a maximum upload size greater than zero.'));
+    }
+    elseif ($max_upload_size_bytes > GcsUploadLimits::GCS_MAX_UPLOAD_SIZE) {
+      $form_state->setErrorByName('max_upload_size', $this->t('The maximum upload size cannot exceed 5 TiB.'));
+    }
   }
 
   /**
@@ -66,17 +111,14 @@ class AdminForm extends ConfigFormBase {
 
     $origin = $form_state->getValue('origin');
     $scheme = $form_state->getValue('scheme');
-    $settings = Settings::get('flysystem', []);
-    $config = $settings[$scheme]['config'];
-    $bucket_name = $config['bucket'];
+    $max_upload_size = trim((string) $form_state->getValue('max_upload_size'));
 
     $this->config('flysystem_gcs_cors.admin')
       ->set('origin', $origin)
-      ->set('scheme', $bucket_name)
+      ->set('scheme', $scheme)
+      ->set('max_upload_size', $max_upload_size)
       ->save();
 
-    $storage = new StorageClient($config);
-    $bucket = $storage->bucket($bucket_name);
     if (empty($origin)) {
       $cors = [];
     }
@@ -87,14 +129,14 @@ class AdminForm extends ConfigFormBase {
         'responseHeader' => [
           'Content-Type',
           'Access-Control-Allow-Origin',
+          'Location',
+          'Range',
         ],
         'maxAgeSeconds' => 3600,
       ],
       ];
     }
-    $bucket->update([
-      'cors' => $cors,
-    ]);
+    $this->gcsBucketResolver->updateBucketCors($scheme, $cors);
   }
 
 }

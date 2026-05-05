@@ -4,6 +4,7 @@ namespace Drupal\flysystem_gcs_cors\Element;
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\file\Element\ManagedFile;
+use Drupal\flysystem_gcs_cors\GcsUploadLimits;
 
 /**
  * Provides an GCS Cors File Element.
@@ -39,6 +40,17 @@ class FlysystemGcsCorsFile extends ManagedFile {
         '#markup' => '<span>File is uploading...</span>',
       ],
     ];
+    $info['upload_error'] = [
+      '#type' => 'container',
+      '#attributes' => [
+        'class' => [
+          'gcs-cors-upload-error',
+          'js-hide',
+        ],
+        'aria-live' => 'assertive',
+        'role' => 'alert',
+      ],
+    ];
 
     return $info;
   }
@@ -48,8 +60,6 @@ class FlysystemGcsCorsFile extends ManagedFile {
    */
   public static function processManagedFile(&$element, FormStateInterface $form_state, &$complete_form) {
     $element = parent::processManagedFile($element, $form_state, $complete_form);
-
-    $element['upload']['#attributes'] = ['class' => ['gcs-cors-upload']];
 
     $js_settings = [
       'entity_type' => $form_state->getformObject()->getEntity()->getEntityType()->id(),
@@ -63,8 +73,11 @@ class FlysystemGcsCorsFile extends ManagedFile {
     }
 
     $field_name = $element['#field_name'];
+    $element['upload']['#attributes']['class'][] = 'gcs-cors-upload';
+    $element['upload']['#attributes']['data-gcs-cors-field-name'] = $field_name;
     $js_settings['element_parents'] = implode('/', $element_parents);
     $element['upload']['#attached']['drupalSettings']['gcs_flysystem_cors'][$field_name] = $js_settings;
+    $element['upload']['#attached']['drupalSettings']['gcs_flysystem_cors']['max_upload_size'] = GcsUploadLimits::getConfiguredMaxUploadSizeFromContainer();
 
     return $element;
   }

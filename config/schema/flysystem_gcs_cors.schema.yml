@@ -1,0 +1,21 @@
+flysystem_gcs_cors.admin:
+  type: config_object
+  label: 'Flysystem GCS CORS settings'
+  mapping:
+    origin:
+      type: string
+      label: 'Allowed origin'
+    scheme:
+      type: string
+      label: 'Flysystem scheme'
+    max_upload_size:
+      type: string
+      label: 'Maximum upload size'
+
+field.widget.settings.flysystem_gcs_cors_file_widget:
+  type: field.widget.settings.file_generic
+  label: 'GCS CORS file widget settings'
+
+field.widget.settings.flysystem_gcs_cors_image_widget:
+  type: field.widget.settings.image_image
+  label: 'GCS CORS image widget settings'

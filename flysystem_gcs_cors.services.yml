@@ -1,0 +1,6 @@
+services:
+  flysystem_gcs_cors.gcs_bucket_resolver:
+    class: Drupal\flysystem_gcs_cors\GcsBucketResolver
+  flysystem_gcs_cors.upload_limits:
+    class: Drupal\flysystem_gcs_cors\GcsUploadLimits
+    arguments: ['@config.factory']

@@ -10,8 +10,13 @@
   visibility: hidden;
 }
 
+.gcs-cors-upload-error {
+  color: #a51b00;
+  margin-top: 0.75rem;
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-  
+
