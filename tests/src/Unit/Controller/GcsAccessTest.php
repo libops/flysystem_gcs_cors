@@ -65,7 +65,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'report.txt');
+    $result = $controller->access('node', 'article', 'field_upload', 0, 'report.txt');
 
     $this->assertFalse($result->isAllowed());
   }
@@ -106,7 +106,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'image.exe');
+    $result = $controller->access('node', 'article', 'field_upload', 0, 'image.exe');
 
     $this->assertFalse($result->isAllowed());
   }
@@ -160,7 +160,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $result = $controller->access('node', 'article', '42', 'field_upload', 0, 'report.pdf');
+    $result = $controller->access('node', 'article', 'field_upload', 0, 'report.pdf', '42');
 
     $this->assertTrue($result->isAllowed());
   }
@@ -201,7 +201,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'report.pdf');
+    $result = $controller->access('node', 'article', 'field_upload', 0, 'report.pdf');
 
     $this->assertFalse($result->isAllowed());
   }
@@ -237,7 +237,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $response = $controller->saveFile('node', 'article', 'null', 'field_upload', 0, 'report.txt', 123);
+    $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
 
     $this->assertSame(404, $response->getStatusCode());
@@ -278,7 +278,7 @@ class GcsAccessTest extends UnitTestCase {
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
-    $response = $controller->saveFile('node', 'article', 'null', 'field_upload', 0, 'report.txt', 123);
+    $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
 
     $this->assertSame(400, $response->getStatusCode());

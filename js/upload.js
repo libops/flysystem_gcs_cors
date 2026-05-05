@@ -55,6 +55,8 @@
       const bundle = settings.bundle;
       const entityId = settings.entity_id;
       const baseUrl = event.data.baseUrl;
+      const routePrefix = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/';
+      const entityPath = entityId ? entityId + '/' : '';
 
       // Get the filelist and the number of files to be uploaded.
       const filelist = fileInput[0].files;
@@ -63,7 +65,7 @@
       // Process each specified file.
       for (let delta = 0; delta < numFiles; delta++) {
         const fileObj = filelist[delta];
-        const ajaxUri = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/' + entityId + '/' + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name);
+        const ajaxUri = routePrefix + entityPath + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name);
         $.get({
           url: ajaxUri,
           success: function (r) {
@@ -83,7 +85,7 @@
               processData: false,
               crossDomain: true,
               success: function(r2) {
-                const saveFileUri = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/' + entityId + '/' + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name) + '/' + fileObj.size;
+                const saveFileUri = routePrefix + entityPath + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name) + '/' + fileObj.size;
                 $.get({
                   url: baseUrl + 'session/token',
                   success: function(csrfToken) {

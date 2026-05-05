@@ -73,12 +73,35 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
    * Tests the save endpoint is protected from CSRFable GET requests.
    */
   public function testSaveRouteRequiresPostAndCsrfHeader(): void {
-    $route = $this->container
-      ->get('router.route_provider')
-      ->getRouteByName('flysystem_gcs_cors.save');
+    $route_provider = $this->container->get('router.route_provider');
+    foreach (['flysystem_gcs_cors.save', 'flysystem_gcs_cors.save_existing'] as $route_name) {
+      $route = $route_provider->getRouteByName($route_name);
 
-    $this->assertSame(['POST'], $route->getMethods());
-    $this->assertSame('TRUE', $route->getRequirement('_csrf_request_header_token'));
+      $this->assertSame(['POST'], $route->getMethods());
+      $this->assertSame('TRUE', $route->getRequirement('_csrf_request_header_token'));
+    }
+  }
+
+  /**
+   * Tests create routes omit entity IDs and update routes require numeric IDs.
+   */
+  public function testUploadRoutesSeparateCreateAndUpdateEntityIds(): void {
+    $route_provider = $this->container->get('router.route_provider');
+
+    $this->assertStringNotContainsString(
+      '{entity_id}',
+      $route_provider->getRouteByName('flysystem_gcs_cors.get')->getPath(),
+    );
+    $this->assertStringNotContainsString(
+      '{entity_id}',
+      $route_provider->getRouteByName('flysystem_gcs_cors.save')->getPath(),
+    );
+
+    foreach (['flysystem_gcs_cors.get_existing', 'flysystem_gcs_cors.save_existing'] as $route_name) {
+      $route = $route_provider->getRouteByName($route_name);
+      $this->assertStringContainsString('{entity_id}', $route->getPath());
+      $this->assertSame('\d+', $route->getRequirement('entity_id'));
+    }
   }
 
 }

@@ -100,7 +100,7 @@ class Gcs extends ControllerBase {
   /**
    * Generate a GCS signed URL to upload a file.
    */
-  public function getSignedUrl($entity_type, $bundle, $entity_id, $field, $delta, $file_name) : JsonResponse {
+  public function getSignedUrl($entity_type, $bundle, $field, $delta, $file_name, $entity_id = NULL) : JsonResponse {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
     if (!isset($fields[$field])) {
       return new JsonResponse(['errmsg' => 'Invalid upload field.'], 400);
@@ -125,7 +125,7 @@ class Gcs extends ControllerBase {
   /**
    * After the file is uploaded as a GCS object, save the file entity in Drupal.
    */
-  public function saveFile($entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size) : JsonResponse {
+  public function saveFile($entity_type, $bundle, $field, $delta, $file_name, $file_size, $entity_id = NULL) : JsonResponse {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
     if (!isset($fields[$field])) {
       return new JsonResponse(['errmsg' => 'Invalid upload field.'], 400);
@@ -180,7 +180,7 @@ class Gcs extends ControllerBase {
   /**
    * Custom access function for AJAX routes.
    */
-  public function access($entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size = FALSE) {
+  public function access($entity_type, $bundle, $field, $delta, $file_name, $entity_id = NULL, $file_size = FALSE) {
     $access_controller = $this->entityTypeManager->getAccessControlHandler($entity_type);
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
     if (!isset($fields[$field])) {
@@ -191,7 +191,7 @@ class Gcs extends ControllerBase {
     $scheme = $field_definition->getSetting('uri_scheme');
 
     // Make sure the account has access to edit or create the entity type.
-    if ($entity_id !== "null") {
+    if ($entity_id !== NULL) {
       $entity = $this->entityTypeManager->getStorage($entity_type)->load($entity_id);
       $entity_access = $entity
         ? $access_controller->access($entity, 'update', $this->currentUser, TRUE)
@@ -220,7 +220,7 @@ class Gcs extends ControllerBase {
    */
   private function getDirectory($file_directory_untokenized, $entity_type, $entity_id) {
     $data = [];
-    if ($entity_id !== "null") {
+    if ($entity_id !== NULL) {
       $entity = $this->entityTypeManager->getStorage($entity_type)->load($entity_id);
       if ($entity) {
         $data[$entity_type] = $entity;

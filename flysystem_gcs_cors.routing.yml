@@ -8,12 +8,32 @@ flysystem_gcs_cors.admin_form:
   options:
     _admin_route: TRUE
 flysystem_gcs_cors.get:
+  path: '/ajax/gcs/{entity_type}/{bundle}/{field}/{delta}/{file_name}'
+  defaults:
+    _title: 'GCS CORS Get Signed URL'
+    _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::getSignedUrl'
+  requirements:
+    _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
+  options:
+    parameters:
+      entity_type:
+        type: string
+      bundle:
+        type: string
+      field:
+        type: string
+      delta:
+        type: integer
+      file_name:
+        type: string
+flysystem_gcs_cors.get_existing:
   path: '/ajax/gcs/{entity_type}/{bundle}/{entity_id}/{field}/{delta}/{file_name}'
   defaults:
     _title: 'GCS CORS Get Signed URL'
     _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::getSignedUrl'
   requirements:
     _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
+    entity_id: '\d+'
   options:
     parameters:
       entity_type:
@@ -29,6 +49,29 @@ flysystem_gcs_cors.get:
       file_name:
         type: string
 flysystem_gcs_cors.save:
+  path: '/ajax/gcs/{entity_type}/{bundle}/{field}/{delta}/{file_name}/{file_size}'
+  defaults:
+    _title: 'GCS CORS Save File'
+    _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::saveFile'
+  requirements:
+    _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
+    _csrf_request_header_token: 'TRUE'
+  methods: [POST]
+  options:
+    parameters:
+      entity_type:
+        type: string
+      bundle:
+        type: string
+      field:
+        type: string
+      delta:
+        type: integer
+      file_name:
+        type: string
+      file_size:
+        type: integer
+flysystem_gcs_cors.save_existing:
   path: '/ajax/gcs/{entity_type}/{bundle}/{entity_id}/{field}/{delta}/{file_name}/{file_size}'
   defaults:
     _title: 'GCS CORS Save File'
@@ -36,6 +79,7 @@ flysystem_gcs_cors.save:
   requirements:
     _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
     _csrf_request_header_token: 'TRUE'
+    entity_id: '\d+'
   methods: [POST]
   options:
     parameters:
