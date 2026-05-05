@@ -29,12 +29,34 @@
 
   Drupal.gcsCors = Drupal.gcsCors || {
 
+    showUploadError: function (fileInput, message) {
+      const wrapper = fileInput.closest('.gcs-cors-file');
+      const form = fileInput.closest('form');
+      Drupal.gcsCors.uploadStatus = Drupal.gcsCors.uploadStatus || {};
+      let targetId = fileInput.attr('id') || '';
+      if (targetId.indexOf('--') >= 0) {
+        targetId = targetId.split('--')[0];
+      }
+      if (targetId) {
+        Drupal.gcsCors.uploadStatus[targetId] = Drupal.gcsCors.uploadStatus[targetId] || {};
+        Drupal.gcsCors.uploadStatus[targetId].error = message;
+      }
+      form.find(':input[type="submit"]').removeAttr('disabled');
+      form.find('.loader').addClass('js-hide');
+      wrapper.find('.gcs-cors-upload-error')
+        .text(message)
+        .removeClass('js-hide');
+    },
+
     triggerUploadButton: function (event) {
 
       const fileInput = $('input#' + event.target.id);
       const form = fileInput.closest('form');
       form.find(':input[type="submit"]').attr('disabled', 'disabled');
       form.find('.loader').removeClass('js-hide');
+      fileInput.closest('.gcs-cors-file').find('.gcs-cors-upload-error')
+        .empty()
+        .addClass('js-hide');
 
       let targetId = event.target.id;
       if (targetId.indexOf('--') >= 0) {
@@ -48,7 +70,7 @@
       };
       const settings = (event.data.settings || {})[fieldNameKey];
       if (!settings) {
-        Drupal.gcsCors.uploadStatus[targetId].error = 'Missing upload settings for ' + fieldNameKey;
+        Drupal.gcsCors.showUploadError(fileInput, 'Missing upload settings for ' + fieldNameKey);
         return;
       }
       const entityType = settings.entity_type;
@@ -103,12 +125,7 @@
                       processData: false,
                       success: function(data) {
                         if (!data.fid) {
-                          if (data.errmsg) {
-                            alert(data.errmsg);
-                          }
-                          else{
-                            alert('File couldn\'t be saved in Drupal');
-                          }
+                          Drupal.gcsCors.showUploadError(fileInput, data.errmsg || 'File couldn\'t be saved in Drupal');
                           return;
                         }
 
@@ -209,20 +226,30 @@
                             },
 
                             error: function (xmlHttpRequest, status, errorThrown) {
-                              alert('Error return from Drupal');
+                              Drupal.gcsCors.showUploadError(fileInput, 'The upload completed, but Drupal could not refresh the file widget.');
                             }
                           });
                         }
                       },
                       error: function(xmlHttpRequest) {
                         const data = xmlHttpRequest.responseJSON || {};
-                        alert(data.errmsg || 'File couldn\'t be saved in Drupal');
+                        Drupal.gcsCors.showUploadError(fileInput, data.errmsg || 'File couldn\'t be saved in Drupal');
                       }
                     });
+                  },
+                  error: function() {
+                    Drupal.gcsCors.showUploadError(fileInput, 'Could not get a Drupal session token for the uploaded file.');
                   }
                 });
+              },
+              error: function() {
+                Drupal.gcsCors.showUploadError(fileInput, 'The file could not be uploaded to cloud storage.');
               }
             });
+          },
+          error: function(xmlHttpRequest) {
+            const data = xmlHttpRequest.responseJSON || {};
+            Drupal.gcsCors.showUploadError(fileInput, data.errmsg || 'Could not prepare the file upload.');
           },
         });
       }

@@ -39,6 +39,17 @@ class FlysystemGcsCorsFile extends ManagedFile {
         '#markup' => '<span>File is uploading...</span>',
       ],
     ];
+    $info['upload_error'] = [
+      '#type' => 'container',
+      '#attributes' => [
+        'class' => [
+          'gcs-cors-upload-error',
+          'js-hide',
+        ],
+        'aria-live' => 'assertive',
+        'role' => 'alert',
+      ],
+    ];
 
     return $info;
   }
