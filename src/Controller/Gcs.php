@@ -12,6 +12,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Utility\Token;
 use Drupal\file\Entity\File;
 use Drupal\flysystem_gcs_cors\GcsBucketResolver;
+use Drupal\flysystem_gcs_cors\GcsUploadLimits;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -122,9 +123,19 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
     }
 
+    $file_size = $this->requestStack->getCurrentRequest()->query->get('file_size');
+    if ($file_size !== NULL && !$this->isAllowedUploadSize($fields[$field], $file_size)) {
+      return new JsonResponse(['errmsg' => 'The selected file exceeds the configured upload size limit.'], 400);
+    }
+
     $object_name = $this->buildObjectName($file_directory_untokenized, $entity_type, $entity_id, $file_name);
     $validFor = new \DateTime('10 min');
     $response = $this->gcsBucketResolver->generateSignedPostPolicyV4(
+      $scheme,
+      $object_name,
+      $validFor
+    );
+    $response['resumable_url'] = $this->gcsBucketResolver->generateSignedResumableUploadUrl(
       $scheme,
       $object_name,
       $validFor
@@ -147,6 +158,10 @@ class Gcs extends ControllerBase {
     $scheme = $fields[$field]->getSetting('uri_scheme');
     if (!$this->gcsBucketResolver->hasBucket($scheme)) {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
+    }
+
+    if (!$this->isAllowedUploadSize($fields[$field], $file_size)) {
+      return new JsonResponse(['errmsg' => 'The selected file exceeds the configured upload size limit.'], 400);
     }
 
     $object_name = $this->requestStack->getCurrentRequest()->request->get('object_name');
@@ -265,6 +280,20 @@ class Gcs extends ControllerBase {
     return str_starts_with($object_name, $prefix)
       && str_ends_with($object_name, '-' . $file_name)
       && !in_array('..', explode('/', $object_name), TRUE);
+  }
+
+  /**
+   * Checks the selected file size against module and field limits.
+   */
+  private function isAllowedUploadSize($field_definition, $file_size): bool {
+    if (!is_numeric($file_size) || (int) $file_size < 0) {
+      return FALSE;
+    }
+    $max_upload_size = GcsUploadLimits::applyFieldMaxFilesizeSetting(
+      GcsUploadLimits::getConfiguredMaxUploadSize(),
+      $field_definition->getSetting('max_filesize')
+    );
+    return (int) $file_size <= $max_upload_size;
   }
 
 }

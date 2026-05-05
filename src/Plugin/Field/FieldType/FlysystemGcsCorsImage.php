@@ -5,6 +5,7 @@ namespace Drupal\flysystem_gcs_cors\Plugin\Field\FieldType;
 use Drupal\Component\Utility\Bytes;
 use Drupal\Component\Utility\Environment;
 use Drupal\Core\Site\Settings;
+use Drupal\flysystem_gcs_cors\GcsUploadLimits;
 use Drupal\image\Plugin\Field\FieldType\ImageItem;
 
 /**
@@ -54,12 +55,10 @@ class FlysystemGcsCorsImage extends ImageItem {
 
     // If this field is using GCS, up the max upload size.
     if (isset($flysystem_settings[$scheme]) && $flysystem_settings[$scheme]['driver'] == 'gcs') {
-      $max_filesize = Bytes::toNumber('10 GB');
+      $max_filesize = GcsUploadLimits::getConfiguredMaxUploadSize();
     }
 
-    if (!empty($settings['max_filesize'])) {
-      $max_filesize = min($max_filesize, Bytes::toNumber($settings['max_filesize']));
-    }
+    $max_filesize = GcsUploadLimits::applyFieldMaxFilesizeSetting($max_filesize, $settings['max_filesize'] ?? NULL);
 
     // There is always a file size limit.
     $validators['FileSizeLimit'] = ['fileLimit' => $max_filesize];

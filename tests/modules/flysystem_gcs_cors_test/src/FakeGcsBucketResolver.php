@@ -41,6 +41,18 @@ class FakeGcsBucketResolver extends GcsBucketResolver {
   /**
    * {@inheritdoc}
    */
+  public function generateSignedResumableUploadUrl(string $scheme, string $object_name, \DateTimeInterface $valid_for): string {
+    return Url::fromRoute('flysystem_gcs_cors_test.fake_resumable_start', [], [
+      'absolute' => TRUE,
+      'query' => [
+        'key' => $object_name,
+      ],
+    ])->toString();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getObjectMetadata(string $scheme, string $object_name): ?array {
     if (!$this->hasBucket($scheme)) {
       return NULL;

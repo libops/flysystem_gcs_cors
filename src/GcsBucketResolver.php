@@ -56,6 +56,16 @@ class GcsBucketResolver {
   }
 
   /**
+   * Generates a signed URL that can initiate a resumable upload session.
+   */
+  public function generateSignedResumableUploadUrl(string $scheme, string $object_name, \DateTimeInterface $valid_for): string {
+    $bucket = $this->buildBucket($scheme);
+    return $bucket->object($object_name)->signedUploadUrl($valid_for, [
+      'version' => 'v4',
+    ]);
+  }
+
+  /**
    * Returns metadata for an uploaded object, or NULL if it does not exist.
    */
   public function getObjectMetadata(string $scheme, string $object_name): ?array {

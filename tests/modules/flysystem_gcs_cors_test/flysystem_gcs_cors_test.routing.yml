@@ -5,3 +5,18 @@ flysystem_gcs_cors_test.fake_upload:
   requirements:
     _access: 'TRUE'
   methods: [POST]
+flysystem_gcs_cors_test.fake_resumable_start:
+  path: '/flysystem-gcs-cors-test/resumable'
+  defaults:
+    _controller: '\Drupal\flysystem_gcs_cors_test\Controller\FakeUploadController::startResumableUpload'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+flysystem_gcs_cors_test.fake_resumable_chunk:
+  path: '/flysystem-gcs-cors-test/resumable/{upload_id}'
+  defaults:
+    _controller: '\Drupal\flysystem_gcs_cors_test\Controller\FakeUploadController::uploadResumableChunk'
+  requirements:
+    _access: 'TRUE'
+    upload_id: '[A-Za-z0-9]+'
+  methods: [PUT]

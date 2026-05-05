@@ -8,6 +8,9 @@ flysystem_gcs_cors.admin:
     scheme:
       type: string
       label: 'Flysystem scheme'
+    max_upload_size:
+      type: string
+      label: 'Maximum upload size'
 
 field.widget.settings.flysystem_gcs_cors_file_widget:
   type: field.widget.settings.file_generic

@@ -239,6 +239,8 @@ class GcsAccessTest extends UnitTestCase {
           'key' => $object_name,
         ],
       ]);
+    $resolver->method('generateSignedResumableUploadUrl')
+      ->willReturnCallback(static fn (string $scheme, string $object_name, \DateTimeInterface $valid_for): string => 'https://uploads.example.test/resumable/' . rawurlencode($object_name));
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
@@ -250,6 +252,48 @@ class GcsAccessTest extends UnitTestCase {
     $this->assertStringEndsWith('-report.txt', $first['object_name']);
     $this->assertSame($first['object_name'], $first['fields']['key']);
     $this->assertSame($second['object_name'], $second['fields']['key']);
+    $this->assertStringContainsString(rawurlencode($first['object_name']), $first['resumable_url']);
+  }
+
+  /**
+   * Tests signed upload URLs are not issued above the configured size limit.
+   */
+  public function testSignedUrlRejectsOversizeFile(): void {
+    $field_definition = $this->createMock(FieldDefinitionInterface::class);
+    $field_definition->method('getSetting')
+      ->willReturnMap([
+        ['file_directory', 'browser-test'],
+        ['uri_scheme', 'gcs'],
+        ['max_filesize', NULL],
+      ]);
+
+    $field_manager = $this->createMock(EntityFieldManagerInterface::class);
+    $field_manager->method('getFieldDefinitions')
+      ->with('node', 'article')
+      ->willReturn([
+        'field_upload' => $field_definition,
+      ]);
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+    $resolver->expects($this->never())
+      ->method('generateSignedPostPolicyV4');
+    $resolver->expects($this->never())
+      ->method('generateSignedResumableUploadUrl');
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, NULL, [
+      'file_size' => 11 * 1024 * 1024 * 1024,
+    ]);
+
+    $response = $controller->getSignedUrl('node', 'article', 'field_upload', 0, 'report.txt');
+    $payload = json_decode($response->getContent(), TRUE);
+
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame('The selected file exceeds the configured upload size limit.', $payload['errmsg']);
   }
 
   /**
@@ -370,7 +414,7 @@ class GcsAccessTest extends UnitTestCase {
   /**
    * Builds the controller with lightweight test doubles.
    */
-  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager, GcsBucketResolver $resolver, ?string $object_name = NULL): Gcs {
+  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager, GcsBucketResolver $resolver, ?string $object_name = NULL, array $query = []): Gcs {
     $mime_type_guesser = $this->createMock('Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser');
     $module_handler = $this->createMock(ModuleHandlerInterface::class);
     $token = $this->createMock(Token::class);
@@ -378,7 +422,8 @@ class GcsAccessTest extends UnitTestCase {
       ->willReturnArgument(0);
     $current_user = $this->createMock(AccountProxyInterface::class);
     $request_stack = new RequestStack();
-    $request_stack->push(Request::create('/', 'POST', $object_name === NULL ? [] : [
+    $uri = empty($query) ? '/' : '/?' . http_build_query($query);
+    $request_stack->push(Request::create($uri, $object_name === NULL ? 'GET' : 'POST', $object_name === NULL ? [] : [
       'object_name' => $object_name,
     ]));
 

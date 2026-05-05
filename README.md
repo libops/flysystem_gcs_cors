@@ -14,6 +14,16 @@ field item class, not only from the selected widget. Non-GCS `file` and `image`
 fields still use PHP's upload limit. GCS-backed fields still respect a field's
 configured `max_filesize` when one is set.
 
+Files up to 5 GiB use the existing signed POST policy upload. Larger files use
+a signed GCS resumable upload session and are sent from the browser in 32 MiB
+chunks. The module-wide default maximum upload size is 10 GB. Site builders can
+raise it as high as GCS's 5 TiB object limit, and individual fields can still set
+a smaller `max_filesize`.
+
+For resumable uploads, the bucket CORS policy must allow `POST` and `PUT` and
+must expose the `Location` and `Range` response headers. Re-save the module's
+CORS settings form after updating to apply those headers to the selected bucket.
+
 Site builders should enable this module only when the site expects core file or
 image fields that use a GCS-backed Flysystem scheme to participate in this
 direct-upload behavior. Custom field type replacements or other modules that

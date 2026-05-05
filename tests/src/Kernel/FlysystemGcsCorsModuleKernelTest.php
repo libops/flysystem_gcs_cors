@@ -57,6 +57,7 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
     $config = $this->config('flysystem_gcs_cors.admin');
     $this->assertSame('', $config->get('origin'));
     $this->assertSame('', $config->get('scheme'));
+    $this->assertSame('10 GB', $config->get('max_upload_size'));
 
     $definition = $this->container
       ->get('config.typed')
@@ -65,8 +66,10 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
     $this->assertArrayHasKey('mapping', $definition);
     $this->assertArrayHasKey('origin', $definition['mapping']);
     $this->assertArrayHasKey('scheme', $definition['mapping']);
+    $this->assertArrayHasKey('max_upload_size', $definition['mapping']);
     $this->assertSame('string', $definition['mapping']['origin']['type']);
     $this->assertSame('string', $definition['mapping']['scheme']['type']);
+    $this->assertSame('string', $definition['mapping']['max_upload_size']['type']);
   }
 
   /**
