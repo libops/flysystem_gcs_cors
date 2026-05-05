@@ -41,6 +41,17 @@ class FakeGcsBucketResolver extends GcsBucketResolver {
   /**
    * {@inheritdoc}
    */
+  public function getObjectMetadata(string $scheme, string $object_name): ?array {
+    if (!$this->hasBucket($scheme)) {
+      return NULL;
+    }
+    $objects = \Drupal::state()->get('flysystem_gcs_cors_test.objects', []);
+    return $objects[$object_name] ?? NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function updateBucketCors(string $scheme, array $cors): void {
   }
 

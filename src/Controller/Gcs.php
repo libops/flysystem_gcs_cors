@@ -137,13 +137,25 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
     }
 
-    $file_mime = $this->mimeTypeGuesser->guessMimeType($file_name);
+    $object_name = $this->getDirectory($file_directory_untokenized, $entity_type, $entity_id) . '/' . $file_name;
+    $object_metadata = $this->gcsBucketResolver->getObjectMetadata($scheme, $object_name);
+    if ($object_metadata === NULL) {
+      return new JsonResponse(['errmsg' => 'The uploaded object was not found in GCS.'], 404);
+    }
+    if (!isset($object_metadata['size'])) {
+      return new JsonResponse(['errmsg' => 'The uploaded object metadata did not include a size.'], 400);
+    }
+    if ((int) $object_metadata['size'] !== (int) $file_size) {
+      return new JsonResponse(['errmsg' => 'The uploaded object size does not match the selected file.'], 400);
+    }
+
+    $file_mime = $object_metadata['contentType'] ?? $this->mimeTypeGuesser->guessMimeType($file_name);
     $values = [
       'uid' => $this->currentUser->id(),
       'status' => 0,
       'filename' => $file_name,
-      'uri' => $fields[$field]->getSetting('uri_scheme') . '://' . $this->getDirectory($file_directory_untokenized, $entity_type, $entity_id) . '/' . $file_name,
-      'filesize' => $file_size,
+      'uri' => $scheme . '://' . $object_name,
+      'filesize' => (int) $object_metadata['size'],
       'filemime' => $file_mime,
       'source' => $field,
     ];

@@ -35,6 +35,8 @@ flysystem_gcs_cors.save:
     _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::saveFile'
   requirements:
     _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
+    _csrf_request_header_token: 'TRUE'
+  methods: [POST]
   options:
     parameters:
       entity_type:

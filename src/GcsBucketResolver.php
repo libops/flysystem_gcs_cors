@@ -56,6 +56,18 @@ class GcsBucketResolver {
   }
 
   /**
+   * Returns metadata for an uploaded object, or NULL if it does not exist.
+   */
+  public function getObjectMetadata(string $scheme, string $object_name): ?array {
+    $bucket = $this->buildBucket($scheme);
+    $object = $bucket->object($object_name);
+    if (!$object->exists()) {
+      return NULL;
+    }
+    return $object->info();
+  }
+
+  /**
    * Updates the configured bucket CORS policy for a scheme.
    */
   public function updateBucketCors(string $scheme, array $cors): void {

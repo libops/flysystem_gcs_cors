@@ -69,4 +69,16 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
     $this->assertSame('string', $definition['mapping']['scheme']['type']);
   }
 
+  /**
+   * Tests the save endpoint is protected from CSRFable GET requests.
+   */
+  public function testSaveRouteRequiresPostAndCsrfHeader(): void {
+    $route = $this->container
+      ->get('router.route_provider')
+      ->getRouteByName('flysystem_gcs_cors.save');
+
+    $this->assertSame(['POST'], $route->getMethods());
+    $this->assertSame('TRUE', $route->getRequirement('_csrf_request_header_token'));
+  }
+
 }

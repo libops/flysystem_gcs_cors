@@ -85,119 +85,132 @@
               success: function(r2) {
                 const saveFileUri = baseUrl + 'ajax/gcs/' + entityType + '/' + bundle + '/' + entityId + '/' + fieldNameKey + '/' + delta + '/' + encodeURIComponent(fileObj.name) + '/' + fileObj.size;
                 $.get({
-                  url: saveFileUri,
-                  success: function(data) {
-                    if (!data.fid) {
-                      if (data.errmsg) {
-                        alert(data.errmsg);
-                      }
-                      else{
-                        alert('File couldn\'t be saved in Drupal');
-                      }
-                      return;
-                    }
-
-                    // Add the fid for this file to hidden fids field.
-                    const fid = data.fid;
-                    Drupal.gcsCors.uploadStatus[targetId].fids.push(fid);
-                    const fidSelector = targetId.replace(/upload$/, 'fids');
-
-                    let fids = $('[data-drupal-selector=' + fidSelector + ']').val();
-                    fids = (fids) ? fids + ' ' + fid : fid;
-                    $('[data-drupal-selector=' + fidSelector + ']').val(fids);
-
-                    // Post the results to Drupal if all files have been processed.
-                    const numFids = fids.split(' ').length;
-                    if (numFids == filelist.length) {
-                      // Use the HTML5 FormData API to build a POST form to send to Drupal.
-                      const fd = new FormData();
-                      // Get the non-submit inputs for processing into FormData.
-                      const inputs = form.find(':input').not('.js-form-submit');
-                      inputs.each(function () {
-                        if (this.name) {
-                          fd.append(this.name, $(this).val());
+                  url: baseUrl + 'session/token',
+                  success: function(csrfToken) {
+                    $.ajax({
+                      url: saveFileUri,
+                      type: 'POST',
+                      headers: {
+                        'X-CSRF-Token': csrfToken
+                      },
+                      success: function(data) {
+                        if (!data.fid) {
+                          if (data.errmsg) {
+                            alert(data.errmsg);
+                          }
+                          else{
+                            alert('File couldn\'t be saved in Drupal');
+                          }
+                          return;
                         }
-                      });
-                      // Get the relevant submit input into FormData.
-                      const submits = form.find(':input.js-form-submit');
-                      submits.each(function () {
-                        if (this.name.substr(0, fieldNameKey.length) == fieldNameKey) {
-                          fd.append('_triggering_element_name', this.name);
-                          fd.append('_triggering_element_value', $(this).val());
-                        }
-                      })
-                      // Add some additional required fields into Formdata.
-                      fd.append('_drupal_ajax', 1);
-                      fd.append('ajax_page_state[theme]', drupalSettings.ajaxPageState.theme);
-                      fd.append('ajax_page_state[theme_token]', drupalSettings.ajaxPageState.theme_token);
-                      fd.append('ajax_page_state[libraries]', drupalSettings.ajaxPageState.libraries);
-                      // Calculate the post url to use.
-                      let posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax&';
 
-                      // integrate with drupal/form_mode_control
-                      // checking for ?display=foo and appending
-                      // to AJAX request if so
-                      const queryString = window.location.search.substring(1);
-                      const queryParams = queryString.split('&');
-                      for (let i = 0; i < queryParams.length; i++) {
-                        const pair = queryParams[i].split('=');
-                        if (decodeURIComponent(pair[0]) === "display") {
-                          posturl += "display=" + decodeURIComponent(pair[1]);
-                        }
-                      }
+                        // Add the fid for this file to hidden fids field.
+                        const fid = data.fid;
+                        Drupal.gcsCors.uploadStatus[targetId].fids.push(fid);
+                        const fidSelector = targetId.replace(/upload$/, 'fids');
 
-                      // Generate and send an ajax request with the uploaded file details.
-                      $.ajax({
-                        url: posturl,
-                        type: 'POST',
-                        enctype: 'multipart/form-data',
-                        data: fd,
-                        cache: false,
-                        contentType: false,
-                        processData: false,
-                        dataType: 'json',
+                        let fids = $('[data-drupal-selector=' + fidSelector + ']').val();
+                        fids = (fids) ? fids + ' ' + fid : fid;
+                        $('[data-drupal-selector=' + fidSelector + ']').val(fids);
 
-                        success: function (response, status, xmlHttpRequest) {
-                          // Set the relevant selector in any of the returned Ajax
-                          // commands that have a null selector.
-                          const responseLength = response.length;
-                          for (let i = 0; i < responseLength; i++) {
-                            const selector = response[i].selector;
-                            if (selector === null) {
-                              // Find the first descendant div with an id beginning with "ajax-wrapper".
-                              let fieldAjaxWrapper = $('div[data-drupal-selector="edit-' + fieldNameKey.replace(/_/g,'-') + '-wrapper"]');
-                              let childDivId;
-                              do {
-                                fieldAjaxWrapper = fieldAjaxWrapper.find('div:first-child');
-                                childDivId = fieldAjaxWrapper.prop('id');
-                              }
-                              while (childDivId == '' || childDivId.indexOf('ajax-wrapper') == -1);
-                              response[i].selector = '#' + childDivId;
+                        // Post the results to Drupal if all files have been processed.
+                        const numFids = fids.split(' ').length;
+                        if (numFids == filelist.length) {
+                          // Use the HTML5 FormData API to build a POST form to send to Drupal.
+                          const fd = new FormData();
+                          // Get the non-submit inputs for processing into FormData.
+                          const inputs = form.find(':input').not('.js-form-submit');
+                          inputs.each(function () {
+                            if (this.name) {
+                              fd.append(this.name, $(this).val());
+                            }
+                          });
+                          // Get the relevant submit input into FormData.
+                          const submits = form.find(':input.js-form-submit');
+                          submits.each(function () {
+                            if (this.name.substr(0, fieldNameKey.length) == fieldNameKey) {
+                              fd.append('_triggering_element_name', this.name);
+                              fd.append('_triggering_element_value', $(this).val());
+                            }
+                          })
+                          // Add some additional required fields into Formdata.
+                          fd.append('_drupal_ajax', 1);
+                          fd.append('ajax_page_state[theme]', drupalSettings.ajaxPageState.theme);
+                          fd.append('ajax_page_state[theme_token]', drupalSettings.ajaxPageState.theme_token);
+                          fd.append('ajax_page_state[libraries]', drupalSettings.ajaxPageState.libraries);
+                          // Calculate the post url to use.
+                          let posturl = '?element_parents=' + settings.element_parents + '&ajax_form=1&_wrapper_format=drupal_ajax&';
+
+                          // integrate with drupal/form_mode_control
+                          // checking for ?display=foo and appending
+                          // to AJAX request if so
+                          const queryString = window.location.search.substring(1);
+                          const queryParams = queryString.split('&');
+                          for (let i = 0; i < queryParams.length; i++) {
+                            const pair = queryParams[i].split('=');
+                            if (decodeURIComponent(pair[0]) === "display") {
+                              posturl += "display=" + decodeURIComponent(pair[1]);
                             }
                           }
-                          // Create a Drupal.Ajax object without associating an
-                          // element, a progress indicator or a URL.
-                          const ajaxObject = Drupal.ajax({
+
+                          // Generate and send an ajax request with the uploaded file details.
+                          $.ajax({
                             url: posturl,
-                            base: false,
-                            element: false,
-                            progress: false
+                            type: 'POST',
+                            enctype: 'multipart/form-data',
+                            data: fd,
+                            cache: false,
+                            contentType: false,
+                            processData: false,
+                            dataType: 'json',
+
+                            success: function (response, status, xmlHttpRequest) {
+                              // Set the relevant selector in any of the returned Ajax
+                              // commands that have a null selector.
+                              const responseLength = response.length;
+                              for (let i = 0; i < responseLength; i++) {
+                                const selector = response[i].selector;
+                                if (selector === null) {
+                                  // Find the first descendant div with an id beginning with "ajax-wrapper".
+                                  let fieldAjaxWrapper = $('div[data-drupal-selector="edit-' + fieldNameKey.replace(/_/g,'-') + '-wrapper"]');
+                                  let childDivId;
+                                  do {
+                                    fieldAjaxWrapper = fieldAjaxWrapper.find('div:first-child');
+                                    childDivId = fieldAjaxWrapper.prop('id');
+                                  }
+                                  while (childDivId == '' || childDivId.indexOf('ajax-wrapper') == -1);
+                                  response[i].selector = '#' + childDivId;
+                                }
+                              }
+                              // Create a Drupal.Ajax object without associating an
+                              // element, a progress indicator or a URL.
+                              const ajaxObject = Drupal.ajax({
+                                url: posturl,
+                                base: false,
+                                element: false,
+                                progress: false
+                              });
+                              // Then, simulate an AJAX response having arrived,
+                              // and let the Ajax system handle it.
+                              ajaxObject.success(response, status,xmlHttpRequest);
+                              Drupal.attachBehaviors();
+
+                              // Re-enable all the submit buttons in the form.
+                              form.find(':input[type="submit"]').removeAttr('disabled');
+                              form.find('.loader').addClass('js-hide');
+                            },
+
+                            error: function (xmlHttpRequest, status, errorThrown) {
+                              alert('Error return from Drupal');
+                            }
                           });
-                          // Then, simulate an AJAX response having arrived,
-                          // and let the Ajax system handle it.
-                          ajaxObject.success(response, status,xmlHttpRequest);
-                          Drupal.attachBehaviors();
-
-                          // Re-enable all the submit buttons in the form.
-                          form.find(':input[type="submit"]').removeAttr('disabled');
-                          form.find('.loader').addClass('js-hide');
-                        },
-
-                        error: function (xmlHttpRequest, status, errorThrown) {
-                          alert('Error return from Drupal');
                         }
-                      });
-                    }
+                      },
+                      error: function(xmlHttpRequest) {
+                        const data = xmlHttpRequest.responseJSON || {};
+                        alert(data.errmsg || 'File couldn\'t be saved in Drupal');
+                      }
+                    });
                   }
                 });
               }
