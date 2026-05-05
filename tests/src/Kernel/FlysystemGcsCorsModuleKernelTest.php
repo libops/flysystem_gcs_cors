@@ -77,6 +77,12 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
    */
   public function testSaveRouteRequiresPostAndCsrfHeader(): void {
     $route_provider = $this->container->get('router.route_provider');
+    foreach (['flysystem_gcs_cors.get', 'flysystem_gcs_cors.get_existing'] as $route_name) {
+      $route = $route_provider->getRouteByName($route_name);
+
+      $this->assertSame(['GET'], $route->getMethods());
+    }
+
     foreach (['flysystem_gcs_cors.save', 'flysystem_gcs_cors.save_existing'] as $route_name) {
       $route = $route_provider->getRouteByName($route_name);
 

@@ -14,6 +14,7 @@ flysystem_gcs_cors.get:
     _controller: '\Drupal\flysystem_gcs_cors\Controller\Gcs::getSignedUrl'
   requirements:
     _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
+  methods: [GET]
   options:
     parameters:
       entity_type:
@@ -34,6 +35,7 @@ flysystem_gcs_cors.get_existing:
   requirements:
     _custom_access: '\Drupal\flysystem_gcs_cors\Controller\Gcs::access'
     entity_id: '\d+'
+  methods: [GET]
   options:
     parameters:
       entity_type:

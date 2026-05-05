@@ -10,10 +10,12 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\PrivateKey;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Utility\Token;
 use Drupal\flysystem_gcs_cors\Controller\Gcs;
 use Drupal\flysystem_gcs_cors\GcsBucketResolver;
+use Drupal\flysystem_gcs_cors\GcsUploadLimits;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -65,7 +67,9 @@ class GcsAccessTest extends UnitTestCase {
       ->with('gcs')
       ->willReturn(TRUE);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, NULL, [
+      'file_size' => 123,
+    ]);
 
     $result = $controller->access('node', 'article', 'field_upload', 0, 'report.txt');
 
@@ -253,6 +257,8 @@ class GcsAccessTest extends UnitTestCase {
     $this->assertSame($first['object_name'], $first['fields']['key']);
     $this->assertSame($second['object_name'], $second['fields']['key']);
     $this->assertStringContainsString(rawurlencode($first['object_name']), $first['resumable_url']);
+    $this->assertNotEmpty($first['upload_token']);
+    $this->assertMatchesRegularExpression('/^\d+:[a-f0-9]{64}$/', $first['upload_token']);
   }
 
   /**
@@ -325,7 +331,9 @@ class GcsAccessTest extends UnitTestCase {
       ->with('gcs', 'browser-test/abc123-report.txt')
       ->willReturn(NULL);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-report.txt');
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $upload_token = $this->getUploadToken($controller, 'browser-test/abc123-report.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
+    $this->setControllerRequest($controller, 'browser-test/abc123-report.txt', $upload_token);
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
@@ -366,7 +374,9 @@ class GcsAccessTest extends UnitTestCase {
         'contentType' => 'text/plain',
       ]);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-report.txt');
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $upload_token = $this->getUploadToken($controller, 'browser-test/abc123-report.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
+    $this->setControllerRequest($controller, 'browser-test/abc123-report.txt', $upload_token);
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
@@ -402,13 +412,54 @@ class GcsAccessTest extends UnitTestCase {
     $resolver->expects($this->never())
       ->method('getObjectMetadata');
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, 'browser-test/abc123-other.txt');
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $upload_token = $this->getUploadToken($controller, 'browser-test/abc123-other.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
+    $this->setControllerRequest($controller, 'browser-test/abc123-other.txt', $upload_token);
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);
 
     $this->assertSame(400, $response->getStatusCode());
     $this->assertSame('Invalid uploaded object name.', $payload['errmsg']);
+  }
+
+  /**
+   * Tests file entities are not saved for object names not issued by Drupal.
+   */
+  public function testSaveFileRejectsInvalidUploadToken(): void {
+    $field_definition = $this->createMock(FieldDefinitionInterface::class);
+    $field_definition->method('getSetting')
+      ->willReturnMap([
+        ['file_directory', 'browser-test'],
+        ['uri_scheme', 'gcs'],
+        ['max_filesize', NULL],
+      ]);
+
+    $field_manager = $this->createMock(EntityFieldManagerInterface::class);
+    $field_manager->method('getFieldDefinitions')
+      ->with('node', 'article')
+      ->willReturn([
+        'field_upload' => $field_definition,
+      ]);
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+    $resolver->expects($this->never())
+      ->method('getObjectMetadata');
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $upload_token = $this->getUploadToken($controller, 'browser-test/issued-report.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
+    $this->setControllerRequest($controller, 'browser-test/unissued-report.txt', $upload_token);
+
+    $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
+    $payload = json_decode($response->getContent(), TRUE);
+
+    $this->assertSame(400, $response->getStatusCode());
+    $this->assertSame('Invalid upload token.', $payload['errmsg']);
   }
 
   /**
@@ -421,11 +472,19 @@ class GcsAccessTest extends UnitTestCase {
     $token->method('replace')
       ->willReturnArgument(0);
     $current_user = $this->createMock(AccountProxyInterface::class);
+    $current_user->method('id')
+      ->willReturn(7);
     $request_stack = new RequestStack();
     $uri = empty($query) ? '/' : '/?' . http_build_query($query);
     $request_stack->push(Request::create($uri, $object_name === NULL ? 'GET' : 'POST', $object_name === NULL ? [] : [
       'object_name' => $object_name,
     ]));
+    $upload_limits = $this->createMock(GcsUploadLimits::class);
+    $upload_limits->method('getConfiguredMaxUploadSize')
+      ->willReturn(10 * 1024 * 1024 * 1024);
+    $private_key = $this->createMock(PrivateKey::class);
+    $private_key->method('get')
+      ->willReturn('unit-test-private-key');
 
     return new Gcs(
       $mime_type_guesser,
@@ -436,7 +495,31 @@ class GcsAccessTest extends UnitTestCase {
       $current_user,
       $resolver,
       $request_stack,
+      $upload_limits,
+      $private_key,
     );
+  }
+
+  /**
+   * Sets the current request on a controller built by buildController().
+   */
+  protected function setControllerRequest(Gcs $controller, string $object_name, string $upload_token): void {
+    $property = new \ReflectionProperty($controller, 'requestStack');
+    $property->setAccessible(TRUE);
+    $request_stack = $property->getValue($controller);
+    $request_stack->push(Request::create('/', 'POST', [
+      'object_name' => $object_name,
+      'upload_token' => $upload_token,
+    ]));
+  }
+
+  /**
+   * Calls the private upload token builder for focused controller tests.
+   */
+  protected function getUploadToken(Gcs $controller, $object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size): string {
+    $method = new \ReflectionMethod($controller, 'buildUploadToken');
+    $method->setAccessible(TRUE);
+    return $method->invoke($controller, $object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, time() + 600);
   }
 
 }

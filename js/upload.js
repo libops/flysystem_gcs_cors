@@ -285,6 +285,7 @@
         success: function (csrfToken) {
           const saveData = new FormData();
           saveData.append('object_name', upload.object_name);
+          saveData.append('upload_token', upload.upload_token);
           $.ajax({
             url: saveFileUri,
             type: 'POST',

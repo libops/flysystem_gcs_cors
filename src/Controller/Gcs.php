@@ -7,6 +7,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\PrivateKey;
 use Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Utility\Token;
@@ -79,9 +80,23 @@ class Gcs extends ControllerBase {
   protected $requestStack;
 
   /**
+   * The upload limits service.
+   *
+   * @var \Drupal\flysystem_gcs_cors\GcsUploadLimits
+   */
+  protected $uploadLimits;
+
+  /**
+   * The private key service.
+   *
+   * @var \Drupal\Core\PrivateKey
+   */
+  protected $privateKey;
+
+  /**
    * {@inheritdoc}
    */
-  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user, GcsBucketResolver $gcs_bucket_resolver, RequestStack $request_stack) {
+  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user, GcsBucketResolver $gcs_bucket_resolver, RequestStack $request_stack, GcsUploadLimits $upload_limits, PrivateKey $private_key) {
     $this->mimeTypeGuesser = $mime_type_guesser;
     $this->entityFieldManager = $entity_field_manager;
     $this->entityTypeManager = $entity_type_manager;
@@ -90,6 +105,8 @@ class Gcs extends ControllerBase {
     $this->currentUser = $current_user;
     $this->gcsBucketResolver = $gcs_bucket_resolver;
     $this->requestStack = $request_stack;
+    $this->uploadLimits = $upload_limits;
+    $this->privateKey = $private_key;
   }
 
   /**
@@ -104,7 +121,9 @@ class Gcs extends ControllerBase {
       $container->get('token'),
       $container->get('current_user'),
       $container->get('flysystem_gcs_cors.gcs_bucket_resolver'),
-      $container->get('request_stack')
+      $container->get('request_stack'),
+      $container->get('flysystem_gcs_cors.upload_limits'),
+      $container->get('private_key')
     );
   }
 
@@ -124,12 +143,16 @@ class Gcs extends ControllerBase {
     }
 
     $file_size = $this->requestStack->getCurrentRequest()->query->get('file_size');
-    if ($file_size !== NULL && !$this->isAllowedUploadSize($fields[$field], $file_size)) {
+    if ($file_size === NULL || !is_numeric($file_size) || (int) $file_size < 0) {
+      return new JsonResponse(['errmsg' => 'Invalid upload size.'], 400);
+    }
+    if (!$this->isAllowedUploadSize($fields[$field], $file_size)) {
       return new JsonResponse(['errmsg' => 'The selected file exceeds the configured upload size limit.'], 400);
     }
 
     $object_name = $this->buildObjectName($file_directory_untokenized, $entity_type, $entity_id, $file_name);
     $validFor = new \DateTime('10 min');
+    $expires = time() + 600;
     $response = $this->gcsBucketResolver->generateSignedPostPolicyV4(
       $scheme,
       $object_name,
@@ -141,6 +164,8 @@ class Gcs extends ControllerBase {
       $validFor
     );
     $response['object_name'] = $object_name;
+    $response['upload_token'] = $this->buildUploadToken($object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, $expires);
+    $response['upload_token_expires'] = $expires;
 
     return new JsonResponse($response);
   }
@@ -165,6 +190,10 @@ class Gcs extends ControllerBase {
     }
 
     $object_name = $this->requestStack->getCurrentRequest()->request->get('object_name');
+    $upload_token = $this->requestStack->getCurrentRequest()->request->get('upload_token');
+    if (!$this->isValidUploadToken($upload_token, $object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size)) {
+      return new JsonResponse(['errmsg' => 'Invalid upload token.'], 400);
+    }
     if (!$this->isValidObjectName($object_name, $file_directory_untokenized, $entity_type, $entity_id, $file_name)) {
       return new JsonResponse(['errmsg' => 'Invalid uploaded object name.'], 400);
     }
@@ -200,7 +229,6 @@ class Gcs extends ControllerBase {
       $values['uuid'] = $file->uuid();
     }
     else {
-      $file->delete();
       $values['errmsg'] = implode("\n", $errors);
     }
 
@@ -290,10 +318,51 @@ class Gcs extends ControllerBase {
       return FALSE;
     }
     $max_upload_size = GcsUploadLimits::applyFieldMaxFilesizeSetting(
-      GcsUploadLimits::getConfiguredMaxUploadSize(),
+      $this->uploadLimits->getConfiguredMaxUploadSize(),
       $field_definition->getSetting('max_filesize')
     );
     return (int) $file_size <= $max_upload_size;
+  }
+
+  /**
+   * Builds an upload token for the exact object and upload context.
+   */
+  private function buildUploadToken($object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, int $expires): string {
+    $payload = $this->buildUploadTokenPayload($object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, $expires);
+    return $expires . ':' . hash_hmac('sha256', $payload, $this->privateKey->get());
+  }
+
+  /**
+   * Validates an upload token.
+   */
+  private function isValidUploadToken($upload_token, $object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size): bool {
+    if (!is_string($upload_token) || !preg_match('/^(\d+):([a-f0-9]{64})$/', $upload_token, $matches)) {
+      return FALSE;
+    }
+    $expires = (int) $matches[1];
+    if ($expires < time()) {
+      return FALSE;
+    }
+    $expected = $this->buildUploadToken($object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, $expires);
+    return hash_equals($expected, $upload_token);
+  }
+
+  /**
+   * Builds the stable upload token payload.
+   */
+  private function buildUploadTokenPayload($object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size, int $expires): string {
+    return json_encode([
+      'object_name' => $object_name,
+      'entity_type' => $entity_type,
+      'bundle' => $bundle,
+      'entity_id' => $entity_id,
+      'field' => $field,
+      'delta' => (string) $delta,
+      'file_name' => $file_name,
+      'file_size' => (string) $file_size,
+      'uid' => (string) $this->currentUser->id(),
+      'expires' => (string) $expires,
+    ]);
   }
 
 }

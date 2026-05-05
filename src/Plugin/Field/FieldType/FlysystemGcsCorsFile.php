@@ -38,7 +38,7 @@ class FlysystemGcsCorsFile extends FileItem {
 
     // If this field is using GCS, up the max upload size.
     if (isset($flysystem_settings[$scheme]) && $flysystem_settings[$scheme]['driver'] == 'gcs') {
-      $max_filesize = GcsUploadLimits::getConfiguredMaxUploadSize();
+      $max_filesize = GcsUploadLimits::getConfiguredMaxUploadSizeFromContainer();
     }
 
     $max_filesize = GcsUploadLimits::applyFieldMaxFilesizeSetting($max_filesize, $settings['max_filesize'] ?? NULL);
