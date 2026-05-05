@@ -9,10 +9,9 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\Site\Settings;
 use Drupal\Core\Utility\Token;
 use Drupal\file\Entity\File;
-use Google\Cloud\Storage\StorageClient;
+use Drupal\flysystem_gcs_cors\GcsBucketResolver;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
@@ -64,15 +63,23 @@ class Gcs extends ControllerBase {
   protected $currentUser;
 
   /**
+   * The GCS bucket resolver service.
+   *
+   * @var \Drupal\flysystem_gcs_cors\GcsBucketResolver
+   */
+  protected $gcsBucketResolver;
+
+  /**
    * {@inheritdoc}
    */
-  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user) {
+  public function __construct(MimeTypeGuesser $mime_type_guesser, EntityFieldManagerInterface $entity_field_manager, EntityTypeManagerInterface $entity_type_manager, ModuleHandlerInterface $module_handler, Token $token, AccountProxyInterface $current_user, GcsBucketResolver $gcs_bucket_resolver) {
     $this->mimeTypeGuesser = $mime_type_guesser;
     $this->entityFieldManager = $entity_field_manager;
     $this->entityTypeManager = $entity_type_manager;
     $this->moduleHandler = $module_handler;
     $this->token = $token;
     $this->currentUser = $current_user;
+    $this->gcsBucketResolver = $gcs_bucket_resolver;
   }
 
   /**
@@ -85,7 +92,8 @@ class Gcs extends ControllerBase {
       $container->get('entity_type.manager'),
       $container->get('module_handler'),
       $container->get('token'),
-      $container->get('current_user')
+      $container->get('current_user'),
+      $container->get('flysystem_gcs_cors.gcs_bucket_resolver')
     );
   }
 
@@ -94,14 +102,17 @@ class Gcs extends ControllerBase {
    */
   public function getSignedUrl($entity_type, $bundle, $entity_id, $field, $delta, $file_name) : JsonResponse {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
+    if (!isset($fields[$field])) {
+      return new JsonResponse(['errmsg' => 'Invalid upload field.'], 400);
+    }
+
     $file_directory_untokenized = $fields[$field]->getSetting('file_directory');
     $scheme = $fields[$field]->getSetting('uri_scheme');
-    $flysystem_settings = Settings::get('flysystem', []);
-    $config = $flysystem_settings[$scheme]['config'];
-    $bucket_name = $config['bucket'];
+    if (!$this->gcsBucketResolver->hasBucket($scheme)) {
+      return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
+    }
 
-    $storage = new StorageClient($config);
-    $bucket = $storage->bucket($bucket_name);
+    $bucket = $this->gcsBucketResolver->getBucket($scheme);
 
     $validFor = new \DateTime('10 min');
     $response = $bucket->generateSignedPostPolicyV4(
@@ -117,7 +128,15 @@ class Gcs extends ControllerBase {
    */
   public function saveFile($entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size) : JsonResponse {
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
+    if (!isset($fields[$field])) {
+      return new JsonResponse(['errmsg' => 'Invalid upload field.'], 400);
+    }
+
     $file_directory_untokenized = $fields[$field]->getSetting('file_directory');
+    $scheme = $fields[$field]->getSetting('uri_scheme');
+    if (!$this->gcsBucketResolver->hasBucket($scheme)) {
+      return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
+    }
 
     $file_mime = $this->mimeTypeGuesser->guessMimeType($file_name);
     $values = [
@@ -158,6 +177,7 @@ class Gcs extends ControllerBase {
     }
 
     $field_definition = $fields[$field];
+    $scheme = $field_definition->getSetting('uri_scheme');
 
     // Make sure the account has access to edit or create the entity type.
     if ($entity_id !== "null") {
@@ -177,6 +197,7 @@ class Gcs extends ControllerBase {
 
     return $entity_access
       ->andIf($access_controller->fieldAccess('edit', $field_definition, $this->currentUser, NULL, TRUE))
+      ->andIf(AccessResult::allowedIf($this->gcsBucketResolver->hasBucket($scheme)))
       ->andIf(AccessResult::allowedIf(in_array($extension, $extensions, TRUE)));
   }
 

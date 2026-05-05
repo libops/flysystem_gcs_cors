@@ -4,13 +4,36 @@ namespace Drupal\flysystem_gcs_cors\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Site\Settings;
-use Google\Cloud\Storage\StorageClient;
+use Drupal\flysystem_gcs_cors\GcsBucketResolver;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Admin settings form.
  */
 class AdminForm extends ConfigFormBase {
+
+  /**
+   * The GCS bucket resolver service.
+   *
+   * @var \Drupal\flysystem_gcs_cors\GcsBucketResolver
+   */
+  protected $gcsBucketResolver;
+
+  /**
+   * Constructs the admin form.
+   */
+  public function __construct(GcsBucketResolver $gcs_bucket_resolver) {
+    $this->gcsBucketResolver = $gcs_bucket_resolver;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('flysystem_gcs_cors.gcs_bucket_resolver')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -40,12 +63,7 @@ class AdminForm extends ConfigFormBase {
       '#default_value' => $config->get('origin'),
     ];
 
-    $options = [];
-    foreach (Settings::get('flysystem', []) as $scheme => $settings) {
-      if ($settings['driver'] === 'gcs') {
-        $options[$scheme] = $scheme . ':// -> ' . $settings['config']['bucket'];
-      }
-    }
+    $options = $this->gcsBucketResolver->getSchemeOptions();
 
     $form['scheme'] = [
       '#type' => 'select',
@@ -66,17 +84,13 @@ class AdminForm extends ConfigFormBase {
 
     $origin = $form_state->getValue('origin');
     $scheme = $form_state->getValue('scheme');
-    $settings = Settings::get('flysystem', []);
-    $config = $settings[$scheme]['config'];
-    $bucket_name = $config['bucket'];
+    $bucket = $this->gcsBucketResolver->getBucket($scheme);
 
     $this->config('flysystem_gcs_cors.admin')
       ->set('origin', $origin)
-      ->set('scheme', $bucket_name)
+      ->set('scheme', $scheme)
       ->save();
 
-    $storage = new StorageClient($config);
-    $bucket = $storage->bucket($bucket_name);
     if (empty($origin)) {
       $cors = [];
     }

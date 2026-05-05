@@ -13,6 +13,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Utility\Token;
 use Drupal\flysystem_gcs_cors\Controller\Gcs;
+use Drupal\flysystem_gcs_cors\GcsBucketResolver;
 use Drupal\Tests\UnitTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Group;
@@ -32,6 +33,7 @@ class GcsAccessTest extends UnitTestCase {
     $field_definition->method('getSetting')
       ->willReturnMap([
         ['file_extensions', 'txt pdf'],
+        ['uri_scheme', 'gcs'],
       ]);
 
     $field_manager = $this->createMock(EntityFieldManagerInterface::class);
@@ -56,7 +58,12 @@ class GcsAccessTest extends UnitTestCase {
       ->with('node')
       ->willReturn($access_handler);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager);
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
     $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'report.txt');
 
@@ -71,6 +78,7 @@ class GcsAccessTest extends UnitTestCase {
     $field_definition->method('getSetting')
       ->willReturnMap([
         ['file_extensions', 'txt pdf'],
+        ['uri_scheme', 'gcs'],
       ]);
 
     $field_manager = $this->createMock(EntityFieldManagerInterface::class);
@@ -91,7 +99,12 @@ class GcsAccessTest extends UnitTestCase {
       ->with('node')
       ->willReturn($access_handler);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager);
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
     $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'image.exe');
 
@@ -108,6 +121,7 @@ class GcsAccessTest extends UnitTestCase {
     $field_definition->method('getSetting')
       ->willReturnMap([
         ['file_extensions', 'txt pdf'],
+        ['uri_scheme', 'gcs'],
       ]);
 
     $field_manager = $this->createMock(EntityFieldManagerInterface::class);
@@ -139,7 +153,12 @@ class GcsAccessTest extends UnitTestCase {
       ->with('node')
       ->willReturn($storage);
 
-    $controller = $this->buildController($field_manager, $entity_type_manager);
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('gcs')
+      ->willReturn(TRUE);
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
 
     $result = $controller->access('node', 'article', '42', 'field_upload', 0, 'report.pdf');
 
@@ -147,9 +166,50 @@ class GcsAccessTest extends UnitTestCase {
   }
 
   /**
+   * Tests non-GCS-backed fields are denied.
+   */
+  public function testInvalidSchemeDenied(): void {
+    $field_definition = $this->createMock(FieldDefinitionInterface::class);
+    $field_definition->method('getSetting')
+      ->willReturnMap([
+        ['file_extensions', 'txt pdf'],
+        ['uri_scheme', 'public'],
+      ]);
+
+    $field_manager = $this->createMock(EntityFieldManagerInterface::class);
+    $field_manager->method('getFieldDefinitions')
+      ->with('node', 'article')
+      ->willReturn([
+        'field_upload' => $field_definition,
+      ]);
+
+    $access_handler = $this->createMock(EntityAccessControlHandlerInterface::class);
+    $access_handler->method('createAccess')
+      ->willReturn(AccessResult::allowed());
+    $access_handler->method('fieldAccess')
+      ->willReturn(AccessResult::allowed());
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+    $entity_type_manager->method('getAccessControlHandler')
+      ->with('node')
+      ->willReturn($access_handler);
+
+    $resolver = $this->createMock(GcsBucketResolver::class);
+    $resolver->method('hasBucket')
+      ->with('public')
+      ->willReturn(FALSE);
+
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+
+    $result = $controller->access('node', 'article', 'null', 'field_upload', 0, 'report.pdf');
+
+    $this->assertFalse($result->isAllowed());
+  }
+
+  /**
    * Builds the controller with lightweight test doubles.
    */
-  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager): Gcs {
+  protected function buildController(EntityFieldManagerInterface $field_manager, EntityTypeManagerInterface $entity_type_manager, GcsBucketResolver $resolver): Gcs {
     $mime_type_guesser = $this->createMock('Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser');
     $module_handler = $this->createMock(ModuleHandlerInterface::class);
     $token = $this->createMock(Token::class);
@@ -162,6 +222,7 @@ class GcsAccessTest extends UnitTestCase {
       $module_handler,
       $token,
       $current_user,
+      $resolver,
     );
   }
 
