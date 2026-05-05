@@ -46,4 +46,25 @@ class FlysystemGcsCorsModuleKernelTest extends KernelTestBase {
     );
   }
 
+  /**
+   * Tests admin config defaults and schema are available.
+   */
+  public function testAdminConfigSchemaAndDefaults(): void {
+    $this->installConfig(['flysystem_gcs_cors']);
+
+    $config = $this->config('flysystem_gcs_cors.admin');
+    $this->assertSame('', $config->get('origin'));
+    $this->assertSame('', $config->get('scheme'));
+
+    $definition = $this->container
+      ->get('config.typed')
+      ->getDefinition('flysystem_gcs_cors.admin');
+
+    $this->assertArrayHasKey('mapping', $definition);
+    $this->assertArrayHasKey('origin', $definition['mapping']);
+    $this->assertArrayHasKey('scheme', $definition['mapping']);
+    $this->assertSame('string', $definition['mapping']['origin']['type']);
+    $this->assertSame('string', $definition['mapping']['scheme']['type']);
+  }
+
 }

@@ -1,3 +1,14 @@
+flysystem_gcs_cors.admin:
+  type: config_object
+  label: 'Flysystem GCS CORS settings'
+  mapping:
+    origin:
+      type: string
+      label: 'Allowed origin'
+    scheme:
+      type: string
+      label: 'Flysystem scheme'
+
 field.widget.settings.gcs_cors_widget:
   type: mapping
   label: 'Gcs cors widget widget settings'
