@@ -391,9 +391,9 @@ class GcsAccessTest extends UnitTestCase {
   }
 
   /**
-   * Tests file entities are not saved for unrelated objects in the directory.
+   * Tests file entities are not saved for unsafe issued object names.
    */
-  public function testSaveFileRejectsObjectNameForDifferentFilename(): void {
+  public function testSaveFileRejectsUnsafeIssuedObjectName(): void {
     $field_definition = $this->createMock(FieldDefinitionInterface::class);
     $field_definition->method('getSetting')
       ->willReturnMap([
@@ -418,8 +418,8 @@ class GcsAccessTest extends UnitTestCase {
       ->method('getObjectMetadata');
 
     $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
-    $upload_token = $this->getUploadToken($controller, 'browser-test/abc123-other.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
-    $this->setControllerRequest($controller, 'browser-test/abc123-other.txt', $upload_token);
+    $upload_token = $this->getUploadToken($controller, 'browser-test/../abc123-report.txt', 'node', 'article', NULL, 'field_upload', 0, 'report.txt', 123);
+    $this->setControllerRequest($controller, 'browser-test/../abc123-report.txt', $upload_token);
 
     $response = $controller->saveFile('node', 'article', 'field_upload', 0, 'report.txt', 123);
     $payload = json_decode($response->getContent(), TRUE);

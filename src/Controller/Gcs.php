@@ -179,7 +179,6 @@ class Gcs extends ControllerBase {
       return new JsonResponse(['errmsg' => 'Invalid upload field.'], 400);
     }
 
-    $file_directory_untokenized = $fields[$field]->getSetting('file_directory');
     $scheme = $fields[$field]->getSetting('uri_scheme');
     if (!$this->gcsBucketResolver->hasBucket($scheme)) {
       return new JsonResponse(['errmsg' => 'The upload field is not backed by a configured GCS scheme.'], 400);
@@ -194,7 +193,7 @@ class Gcs extends ControllerBase {
     if (!$this->isValidUploadToken($upload_token, $object_name, $entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size)) {
       return new JsonResponse(['errmsg' => 'Invalid upload token.'], 400);
     }
-    if (!$this->isValidObjectName($object_name, $file_directory_untokenized, $entity_type, $entity_id, $file_name)) {
+    if (!$this->isValidObjectName($object_name, $file_name)) {
       return new JsonResponse(['errmsg' => 'Invalid uploaded object name.'], 400);
     }
     $object_metadata = $this->gcsBucketResolver->getObjectMetadata($scheme, $object_name);
@@ -297,16 +296,13 @@ class Gcs extends ControllerBase {
   }
 
   /**
-   * Checks that the submitted object belongs to the expected upload directory.
+   * Checks that the submitted object name is safe for the expected file.
    */
-  private function isValidObjectName($object_name, $file_directory_untokenized, $entity_type, $entity_id, $file_name): bool {
+  private function isValidObjectName($object_name, $file_name): bool {
     if (!is_string($object_name) || $object_name === '') {
       return FALSE;
     }
-    $directory = trim($this->getDirectory($file_directory_untokenized, $entity_type, $entity_id), '/');
-    $prefix = $directory === '' ? '' : $directory . '/';
-    return str_starts_with($object_name, $prefix)
-      && str_ends_with($object_name, '-' . $file_name)
+    return str_ends_with($object_name, '-' . $file_name)
       && !in_array('..', explode('/', $object_name), TRUE);
   }
 
