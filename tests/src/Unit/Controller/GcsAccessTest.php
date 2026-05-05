@@ -246,9 +246,14 @@ class GcsAccessTest extends UnitTestCase {
     $resolver->method('generateSignedResumableUploadUrl')
       ->willReturnCallback(static fn (string $scheme, string $object_name, \DateTimeInterface $valid_for): string => 'https://uploads.example.test/resumable/' . rawurlencode($object_name));
 
-    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver);
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, NULL, [
+      'file_size' => 123,
+    ]);
 
     $first = json_decode($controller->getSignedUrl('node', 'article', 'field_upload', 0, 'report.txt')->getContent(), TRUE);
+    $controller = $this->buildController($field_manager, $entity_type_manager, $resolver, NULL, [
+      'file_size' => 123,
+    ]);
     $second = json_decode($controller->getSignedUrl('node', 'article', 'field_upload', 1, 'report.txt')->getContent(), TRUE);
 
     $this->assertNotSame($first['object_name'], $second['object_name']);
