@@ -5,3 +5,4 @@ package: Flysystem
 core_version_requirement: ^10.2 || ^11
 dependencies:
   - flysystem_gcs:flysystem_gcs
+  - token:token

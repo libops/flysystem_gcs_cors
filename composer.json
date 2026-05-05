@@ -3,6 +3,9 @@
     "description": "Extends the drupal/flysystem_gcs_cors module by allowing direct uploads to the GCS bucket.",
     "type": "drupal-module",
     "homepage": "https://www.drupal.org/project/flysystem_gcs_cors",
+    "require": {
+        "drupal/token" : "^1.17"
+    },
     "support": {
         "issues": "https://www.drupal.org/project/issues/flysystem_gcs_cors"
     },

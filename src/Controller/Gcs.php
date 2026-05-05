@@ -10,8 +10,8 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\ProxyClass\File\MimeType\MimeTypeGuesser;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Site\Settings;
+use Drupal\Core\Utility\Token;
 use Drupal\file\Entity\File;
-use Drupal\token\Token;
 use Google\Cloud\Storage\StorageClient;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -153,25 +153,31 @@ class Gcs extends ControllerBase {
   public function access($entity_type, $bundle, $entity_id, $field, $delta, $file_name, $file_size = FALSE) {
     $access_controller = $this->entityTypeManager->getAccessControlHandler($entity_type);
     $fields = $this->entityFieldManager->getFieldDefinitions($entity_type, $bundle);
+    if (!isset($fields[$field])) {
+      return AccessResult::forbidden();
+    }
+
+    $field_definition = $fields[$field];
 
     // Make sure the account has access to edit or create the entity type.
     if ($entity_id !== "null") {
       $entity = $this->entityTypeManager->getStorage($entity_type)->load($entity_id);
-      $has_access = $entity && $access_controller->access($entity, 'update');
+      $entity_access = $entity
+        ? $access_controller->access($entity, 'update', $this->currentUser, TRUE)
+        : AccessResult::forbidden();
     }
     else {
-      $has_access = $access_controller->createAccess($bundle);
+      $entity_access = $access_controller->createAccess($bundle, $this->currentUser, [], TRUE);
     }
 
     // Make sure the file extension is allowed.
     $extension = substr($file_name, strrpos($file_name, '.') + 1);
-    $extensions = $fields[$field]->getSetting('file_extensions');
+    $extensions = $field_definition->getSetting('file_extensions');
     $extensions = explode(' ', $extensions);
 
-    return AccessResult::allowedIf($has_access &&
-      isset($fields[$field]) &&
-      $access_controller->fieldAccess('edit', $fields[$field]) &&
-      in_array($extension, $extensions));
+    return $entity_access
+      ->andIf($access_controller->fieldAccess('edit', $field_definition, $this->currentUser, NULL, TRUE))
+      ->andIf(AccessResult::allowedIf(in_array($extension, $extensions, TRUE)));
   }
 
   /**
